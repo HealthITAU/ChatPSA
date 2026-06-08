@@ -220,4 +220,4 @@ Contributions are welcome — bug fixes, new integrations, UI improvements. Feel
 
 ## Licence
 
-Licence TBD.
+[GNU Affero General Public License v3.0](LICENSE) — free to use, modify, and self-host. If you run a modified version as a hosted service, you must publish your changes under the same licence.
