@@ -1,0 +1,8 @@
+venv/
+__pycache__/
+*.pyc
+*.db
+.env
+.git/
+README.md
+.dockerignore

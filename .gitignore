@@ -1,0 +1,62 @@
+# ── Python ────────────────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg-info/
+dist/
+build/
+venv/
+.venv/
+
+# ── Environment & secrets ────────────────────────────────────────────────────
+.env
+docker-compose.override.yml
+*.pem
+*.key
+
+# ── Databases (runtime artifacts) ────────────────────────────────────────────
+*.db
+*.db-wal
+*.db-shm
+*.sqlite3
+
+# ── Data files (customer-specific, never commit) ───────────────────────────
+mappings.json
+
+# ── Sync lock files ──────────────────────────────────────────────────────────
+.sync_running_*
+.secret_key
+
+# ── OS / editor artifacts ────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+.fuse_hidden*
+*.swp
+*.swo
+*~
+.idea/
+.vscode/
+.obsidian/
+
+# ── Archive (legacy development artifacts from pre-git era) ──────────────────
+_archive/
+
+# ── Excluded files (API outputs, debug data — not for version control) ──────
+_exclude/
+
+# ── Legacy directories (pre-git, to be archived) ────────────────────────────
+chatpsa-agent/
+chatpsa-agent-staging/
+ConnectWise Manage Agent/
+ConnectWise Manage Agent.zip
+memory-feature/
+frontend-design/
+frontend-design-workspace/
+frontend-design.skill
+postgres-handoff/
+_backups/
+
+# ── Stale root-level files from previous development ─────────────────────────
+chatpsa-staging.conf
+nginx.conf

@@ -1,0 +1,2351 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Administration — {{ app_name }}</title>
+    <link rel="icon" type="image/x-icon" href="/static/favicon.ico">
+    <link rel="icon" type="image/png" sizes="32x32" href="/static/favicon-32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="/static/favicon-16.png">
+    <link rel="apple-touch-icon" sizes="180x180" href="/static/apple-touch-icon.png">
+    <style>
+        :root, [data-theme="dark"] {
+            --bg: #0f1117;
+            --surface: #1a1d27;
+            --surface-hover: #242736;
+            --border: #2e3142;
+            --text: #e1e4ed;
+            --text-muted: #8b8fa3;
+            --accent: #6c63ff;
+            --success: #34d399;
+            --warning: #fbbf24;
+            --error: #f87171;
+        }
+        [data-theme="light"] {
+            --bg: #f5f6f8;
+            --surface: #ffffff;
+            --surface-hover: #f0f1f4;
+            --border: #dcdee4;
+            --text: #1a1d27;
+            --text-muted: #6b7084;
+            --accent: #5b52e0;
+            --success: #16a369;
+            --warning: #d97706;
+            --error: #dc2626;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            transition: background 0.2s, color 0.2s;
+        }
+
+        /* ── Responsive page width ───────────────────────────────── */
+        .page {
+            padding: 24px 40px;
+            max-width: 900px;
+            margin: 0 auto;
+        }
+        @media (min-width: 1024px) { .page { max-width: 1100px; } }
+        @media (min-width: 1400px) { .page { max-width: 1400px; padding: 24px 48px; } }
+
+        .info-bar {
+            font-size: 12px;
+            color: var(--text-muted);
+            margin-bottom: 20px;
+            padding: 10px 14px;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+        }
+
+        .users-table-wrap {
+            overflow-x: auto;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+        }
+        th {
+            text-align: left;
+            padding: 10px 14px;
+            background: var(--surface);
+            color: var(--text-muted);
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            border-bottom: 1px solid var(--border);
+            white-space: nowrap;
+        }
+        td {
+            padding: 10px 14px;
+            border-bottom: 1px solid var(--border);
+            vertical-align: middle;
+        }
+        tr:hover td { background: var(--surface-hover); }
+
+        .user-email { font-size: 11px; color: var(--text-muted); }
+        .user-name { font-weight: 600; }
+        .last-seen { font-size: 11px; color: var(--text-muted); }
+
+        /* Toggle switch */
+        .toggle { position: relative; display: inline-block; width: 36px; height: 20px; }
+        .toggle input { opacity: 0; width: 0; height: 0; }
+        .toggle .slider {
+            position: absolute; cursor: pointer;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: var(--border); border-radius: 20px; transition: background 0.2s;
+        }
+        .toggle .slider::before {
+            content: ''; position: absolute;
+            height: 14px; width: 14px; left: 3px; bottom: 3px;
+            background: var(--text-muted); border-radius: 50%; transition: all 0.2s;
+        }
+        .toggle input:checked + .slider { background: var(--accent); }
+        .toggle input:checked + .slider::before { transform: translateX(16px); background: #fff; }
+
+        .feature-col { text-align: center; }
+
+        .toggle-all {
+            display: inline-flex; margin-left: 6px; vertical-align: middle;
+            transform: scale(0.8); opacity: 0.7; transition: opacity 0.15s;
+        }
+        .toggle-all:hover { opacity: 1; }
+        th .toggle-all { margin-top: 2px; }
+
+        .empty-state {
+            text-align: center; padding: 40px;
+            color: var(--text-muted); font-size: 13px;
+        }
+
+        .badge-activated {
+            display: inline-block; font-size: 9px; font-weight: 600;
+            text-transform: uppercase; letter-spacing: 0.04em;
+            padding: 2px 6px; border-radius: 4px; margin-left: 6px; vertical-align: middle;
+        }
+        .badge-activated.yes { background: rgba(52,211,153,0.15); color: var(--success); }
+        .badge-activated.no { background: rgba(139,143,163,0.12); color: var(--text-muted); }
+
+        tr.row-hidden td { opacity: 0.45; }
+        tr.row-hidden:hover td { opacity: 0.7; }
+
+        .btn-hide {
+            background: none; border: 1px solid var(--border); border-radius: 4px;
+            color: var(--text-muted); font-size: 10px; padding: 2px 8px;
+            cursor: pointer; transition: all 0.15s; white-space: nowrap;
+        }
+        .btn-hide:hover { border-color: var(--accent); color: var(--text); }
+
+        .controls-bar {
+            display: flex; align-items: center; gap: 12px; margin-bottom: 12px;
+        }
+        .controls-bar label {
+            font-size: 12px; color: var(--text-muted); cursor: pointer;
+            display: flex; align-items: center; gap: 6px;
+        }
+        .controls-bar input[type="checkbox"] { accent-color: var(--accent); }
+        .user-count { font-size: 11px; color: var(--text-muted); margin-left: auto; }
+
+        .saving-indicator {
+            display: inline-block; font-size: 11px; color: var(--accent);
+            margin-left: 6px; opacity: 0; transition: opacity 0.2s;
+        }
+        .saving-indicator.visible { opacity: 1; }
+
+        /* ── Page header ─────────────────────────────────────────── */
+        .page-header {
+            display: flex; align-items: center; justify-content: space-between;
+            margin-bottom: 16px;
+        }
+        .page-header h1 { font-size: 20px; font-weight: 600; margin: 0; }
+        .btn-restart {
+            display: inline-flex; align-items: center; gap: 6px;
+            background: var(--surface); border: 1px solid var(--border); border-radius: 6px;
+            color: var(--text); font-size: 12px; font-weight: 500;
+            padding: 6px 14px; cursor: pointer; transition: all 0.15s;
+        }
+        .btn-restart:hover { border-color: var(--accent); color: var(--accent); }
+        .btn-restart:disabled { opacity: 0.4; cursor: not-allowed; }
+        .btn-restart .spinner {
+            display: none; width: 12px; height: 12px;
+            border: 2px solid var(--border); border-top-color: var(--accent);
+            border-radius: 50%; animation: spin 0.6s linear infinite;
+        }
+        .btn-restart.restarting .spinner { display: inline-block; }
+        .btn-restart.restarting .btn-icon { display: none; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* ── Settings — card layout ──────────────────────────────── */
+        .settings-card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 20px 24px;
+            margin-bottom: 16px;
+        }
+        .settings-card-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 16px;
+            padding-bottom: 12px;
+            border-bottom: 1px solid var(--border);
+        }
+        .settings-card-title {
+            font-size: 15px;
+            font-weight: 600;
+            color: var(--text);
+        }
+        .settings-card-desc {
+            font-size: 12px;
+            color: var(--text-muted);
+            margin-top: 2px;
+        }
+        .service-status {
+            display: inline-flex; align-items: center; gap: 5px;
+            font-size: 11px; font-weight: 500;
+            padding: 3px 10px; border-radius: 12px;
+        }
+        .service-status .dot {
+            width: 7px; height: 7px; border-radius: 50%; display: inline-block;
+        }
+        .service-status.configured { color: var(--success); background: rgba(52,211,153,0.1); }
+        .service-status.configured .dot { background: var(--success); }
+        .service-status.not-configured { color: var(--text-muted); background: rgba(139,143,163,0.08); }
+        .service-status.not-configured .dot { background: var(--text-muted); opacity: 0.5; }
+
+        .settings-grid {
+            display: grid;
+            gap: 12px;
+        }
+        .setting-row {
+            display: grid;
+            grid-template-columns: 1fr 1.5fr 80px;
+            align-items: start;
+            gap: 12px;
+            padding: 8px 0;
+        }
+        @media (max-width: 768px) {
+            .setting-row { grid-template-columns: 1fr; gap: 6px; }
+            .setting-error { grid-column: 1; }
+        }
+        .setting-label { font-size: 13px; font-weight: 600; }
+        .setting-desc { font-size: 11px; color: var(--text-muted); margin-top: 3px; line-height: 1.4; }
+        .setting-help-link {
+            font-size: 12px;
+            color: var(--accent);
+            text-decoration: none;
+            margin-top: 2px;
+            display: inline-block;
+        }
+        .setting-help-link:hover {
+            text-decoration: underline;
+        }
+        .setting-env { font-size: 10px; color: var(--text-muted); font-family: monospace; margin-top: 2px; }
+        .setting-input {
+            background: var(--bg); border: 1px solid var(--border); border-radius: 6px;
+            padding: 6px 10px; color: var(--text); font-size: 13px; font-family: inherit; width: 100%;
+        }
+        .setting-input:focus { outline: none; border-color: var(--accent); }
+        .setting-input:disabled { opacity: 0.5; cursor: not-allowed; }
+        .setting-save {
+            background: var(--accent); color: #fff; border: none; border-radius: 6px;
+            padding: 6px 14px; font-size: 12px; font-weight: 600;
+            cursor: pointer; white-space: nowrap; transition: opacity 0.15s;
+        }
+        .setting-save:hover { opacity: 0.85; }
+        .setting-save:disabled { opacity: 0.4; cursor: not-allowed; }
+        .setting-saved { font-size: 11px; color: var(--success); min-width: 80px; text-align: center; display: inline-block; }
+        .setting-input.invalid { border-color: var(--danger, #ef4444); }
+        .setting-error { font-size: 11px; color: var(--danger, #ef4444); margin-top: 3px; grid-column: 2; }
+        .setting-auto-detected { font-size: 11px; color: var(--accent); margin-top: 3px; grid-column: 2; font-style: italic; }
+        .setting-test { background: transparent; color: var(--accent); border: 1px solid var(--accent);
+            border-radius: 6px; padding: 6px 14px; font-size: 12px; font-weight: 600; cursor: pointer;
+            white-space: nowrap; transition: opacity 0.15s; margin-top: 8px; }
+        .setting-test:hover { opacity: 0.85; background: rgba(59,130,246,0.08); }
+        .setting-test:disabled { opacity: 0.4; cursor: not-allowed; }
+        .test-result { font-size: 12px; margin-top: 6px; padding: 6px 10px; border-radius: 6px; }
+        .test-result.success { color: var(--success); background: rgba(34,197,94,0.08); }
+        .test-result.error { color: var(--danger, #ef4444); background: rgba(239,68,68,0.08); }
+        .env-override-banner {
+            display: flex; align-items: center; gap: 8px;
+            padding: 10px 14px; background: rgba(251,191,36,0.1);
+            border: 1px solid rgba(251,191,36,0.3); border-radius: 8px;
+            color: var(--warning); font-size: 12px; margin-bottom: 16px;
+        }
+        .settings-section-title {
+            font-size: 13px; font-weight: 600; color: var(--text-muted);
+            text-transform: uppercase; letter-spacing: 0.04em;
+            margin: 0 0 12px 0;
+        }
+
+        /* ── Tab navigation ─────────────────────────────────────── */
+        .admin-tabs {
+            display: flex; gap: 0; border-bottom: 1px solid var(--border); margin-bottom: 20px;
+        }
+        .admin-tab {
+            padding: 10px 20px; font-size: 13px; font-weight: 600;
+            color: var(--text-muted); cursor: pointer;
+            border-bottom: 2px solid transparent; transition: all 0.15s;
+            background: none; border-top: none; border-left: none; border-right: none;
+        }
+        .admin-tab:hover { color: var(--text); }
+        .admin-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+
+        /* ── Mappings section ─────────────────────────────────────── */
+        .mappings-toolbar {
+            display: flex; align-items: center; gap: 12px; margin-bottom: 16px;
+            flex-wrap: wrap;
+        }
+        .mappings-toolbar input[type="text"] {
+            background: var(--surface); border: 1px solid var(--border); border-radius: 6px;
+            padding: 6px 12px; color: var(--text); font-size: 13px; width: 260px;
+        }
+        .mappings-toolbar input[type="text"]:focus { outline: none; border-color: var(--accent); }
+        .mapping-filter-btns { display: flex; gap: 6px; }
+        .mapping-filter-btn {
+            background: var(--surface); border: 1px solid var(--border); border-radius: 6px;
+            padding: 4px 12px; font-size: 11px; color: var(--text-muted);
+            cursor: pointer; transition: all 0.15s;
+        }
+        .mapping-filter-btn.active {
+            background: var(--accent); border-color: var(--accent); color: #fff;
+        }
+        .mapping-filter-btn:hover:not(.active) { border-color: var(--accent); color: var(--text); }
+        .svc-filter-btns {
+            display: flex; gap: 4px; margin-left: 8px;
+            padding-left: 8px; border-left: 1px solid var(--border);
+        }
+        .svc-filter-btn {
+            background: none; border: 1px solid var(--border); border-radius: 6px;
+            padding: 4px 10px; font-size: 10px; color: var(--text-muted);
+            cursor: pointer; transition: all 0.15s; text-transform: uppercase;
+            font-weight: 600; letter-spacing: 0.02em;
+        }
+        .svc-filter-btn.active {
+            background: rgba(108,99,255,0.12); border-color: var(--accent); color: var(--accent);
+        }
+        .svc-filter-btn:hover:not(.active) { border-color: var(--accent); color: var(--text); }
+        .mapping-card {
+            background: var(--surface); border: 1px solid var(--border);
+            border-radius: 8px; padding: 12px 16px; margin-bottom: 8px;
+        }
+        .mapping-card-header {
+            display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;
+        }
+        .mapping-company-name { font-weight: 600; font-size: 14px; }
+        .mapping-company-id { font-size: 10px; color: var(--text-muted); font-family: monospace; }
+        .mapping-services { display: flex; flex-wrap: wrap; gap: 8px; }
+        .mapping-service {
+            display: flex; flex-direction: column; gap: 4px;
+            padding: 8px 10px; background: var(--bg); border: 1px solid var(--border);
+            border-radius: 6px; font-size: 12px; flex: 1; min-width: 200px;
+        }
+        .mapping-service-top {
+            display: flex; align-items: center; gap: 6px;
+        }
+        .mapping-suggestion {
+            display: flex; align-items: center; gap: 6px;
+            padding: 4px 8px; background: rgba(108,99,255,0.06);
+            border: 1px dashed rgba(108,99,255,0.3); border-radius: 4px;
+            font-size: 11px; color: var(--text-muted);
+        }
+        .mapping-suggestion .sug-name { color: var(--text); font-weight: 500; }
+        .mapping-suggestion .btn-accept {
+            margin-left: auto; padding: 2px 10px; font-size: 10px;
+        }
+        .mapping-service select,
+        .mapping-service input[type="text"] {
+            background: var(--bg); border: 1px solid var(--border); border-radius: 4px;
+            padding: 3px 6px; color: var(--text); font-size: 12px; min-width: 200px;
+        }
+        .mapping-service select:focus,
+        .mapping-service input[type="text"]:focus { outline: none; border-color: var(--accent); }
+        .mapping-service-label {
+            font-weight: 600; font-size: 11px; color: var(--text-muted);
+            text-transform: uppercase; white-space: nowrap;
+        }
+        .mapping-badge {
+            display: inline-block; font-size: 9px; font-weight: 600;
+            text-transform: uppercase; padding: 2px 6px; border-radius: 4px;
+        }
+        .mapping-badge.mapped { background: rgba(52,211,153,0.15); color: var(--success); }
+        .mapping-badge.unmapped { background: rgba(251,191,36,0.1); color: var(--warning); }
+        .mapping-badge.partial { background: rgba(108,99,255,0.1); color: var(--accent); }
+        .mapping-badge.ignored { background: rgba(150,150,150,0.1); color: var(--text-muted); }
+        .mapping-badge.suggested { background: rgba(108,99,255,0.15); color: var(--accent); }
+        .mapping-card.ignored { opacity: 0.5; }
+        .svc-dot {
+            display: inline-block; width: 8px; height: 8px; border-radius: 50%;
+            margin-right: 4px; flex-shrink: 0;
+        }
+        .svc-dot.mapped { background: var(--success); }
+        .svc-dot.unmapped { background: var(--warning); }
+        .btn-ignore {
+            background: none; border: 1px solid var(--border); border-radius: 4px;
+            padding: 2px 8px; font-size: 10px; cursor: pointer; color: var(--text-muted);
+            transition: all 0.15s;
+        }
+        .btn-ignore:hover { background: rgba(150,150,150,0.1); border-color: var(--text-muted); }
+        .btn-save-mapping {
+            background: var(--accent); color: #fff; border: none; border-radius: 4px;
+            padding: 3px 10px; font-size: 10px; font-weight: 600; cursor: pointer;
+            transition: all 0.15s; display: none;
+        }
+        .btn-save-mapping:hover { opacity: 0.9; }
+        .suggestion-actions { display: flex; gap: 4px; margin-left: 4px; }
+        .btn-accept, .btn-reject {
+            background: none; border: 1px solid var(--border); border-radius: 4px;
+            padding: 1px 8px; font-size: 10px; cursor: pointer; transition: all 0.15s;
+        }
+        .btn-accept { color: var(--success); }
+        .btn-accept:hover { background: rgba(52,211,153,0.15); border-color: var(--success); }
+        .btn-accept-all, .btn-dismiss-all {
+            background: none; border-radius: 4px;
+            padding: 3px 10px; font-size: 10px; cursor: pointer;
+            transition: all 0.15s; white-space: nowrap;
+        }
+        .btn-accept-all { border: 1px solid var(--success); color: var(--success); }
+        .btn-accept-all:hover { background: rgba(52,211,153,0.15); }
+        .btn-dismiss-all { border: 1px solid var(--text-muted); color: var(--text-muted); }
+        .btn-dismiss-all:hover { background: rgba(150,150,150,0.1); }
+        .btn-accept-all:disabled, .btn-dismiss-all:disabled { opacity: 0.5; cursor: not-allowed; }
+        .btn-accept-all.toolbar-btn, .btn-dismiss-all.toolbar-btn { font-size: 11px; padding: 4px 12px; }
+        .mapping-card-actions { display: flex; gap: 6px; margin-left: auto; }
+        .btn-reject { color: var(--error); }
+        .btn-reject:hover { background: rgba(248,113,113,0.15); border-color: var(--error); }
+        .mapping-count { font-size: 11px; color: var(--text-muted); margin-left: auto; }
+
+        /* ── Sync Status tab ────────────────────────────────────── */
+        .sync-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+            gap: 16px;
+        }
+        .sync-card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 20px 24px;
+            display: flex; flex-direction: column; gap: 12px;
+        }
+        .sync-card-header {
+            display: flex; align-items: center; justify-content: space-between;
+        }
+        .sync-card-title {
+            font-size: 15px; font-weight: 600; color: var(--text);
+        }
+        .sync-status-pill {
+            display: inline-flex; align-items: center; gap: 5px;
+            font-size: 11px; font-weight: 500;
+            padding: 3px 10px; border-radius: 12px;
+        }
+        .sync-status-pill .dot {
+            width: 7px; height: 7px; border-radius: 50%; display: inline-block;
+        }
+        .sync-status-pill.ok { color: var(--success); background: rgba(52,211,153,0.1); }
+        .sync-status-pill.ok .dot { background: var(--success); }
+        .sync-status-pill.error { color: var(--error); background: rgba(248,113,113,0.1); }
+        .sync-status-pill.error .dot { background: var(--error); }
+        .sync-status-pill.running { color: var(--accent); background: rgba(108,99,255,0.1); }
+        .sync-status-pill.running .dot { background: var(--accent); animation: pulse 1.2s ease-in-out infinite; }
+        .sync-status-pill.idle { color: var(--text-muted); background: rgba(139,143,163,0.08); }
+        .sync-status-pill.idle .dot { background: var(--text-muted); opacity: 0.5; }
+        @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.3; } }
+
+        .sync-meta { display: flex; flex-wrap: wrap; gap: 16px; }
+        .sync-meta-item {
+            display: flex; flex-direction: column; gap: 2px;
+        }
+        .sync-meta-label {
+            font-size: 10px; color: var(--text-muted); text-transform: uppercase;
+            font-weight: 600; letter-spacing: 0.04em;
+        }
+        .sync-meta-value { font-size: 13px; color: var(--text); }
+
+        .sync-entities {
+            border-top: 1px solid var(--border); padding-top: 10px;
+        }
+        .sync-entity-row {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 4px 0; font-size: 12px;
+        }
+        .sync-entity-name { color: var(--text); font-weight: 500; }
+        .sync-entity-count { color: var(--text-muted); font-family: monospace; font-size: 11px; }
+        .sync-entity-error {
+            font-size: 11px; color: var(--error); margin-top: 2px;
+            padding: 6px 10px; background: rgba(248,113,113,0.08);
+            border-radius: 6px; word-break: break-word;
+        }
+        .sync-entity-status {
+            display: inline-block; width: 6px; height: 6px; border-radius: 50%;
+            margin-right: 6px;
+        }
+        .sync-entity-status.ok { background: var(--success); }
+        .sync-entity-status.error { background: var(--error); }
+
+        .btn-sync-now {
+            display: inline-flex; align-items: center; gap: 6px;
+            background: var(--surface); border: 1px solid var(--border); border-radius: 6px;
+            color: var(--text); font-size: 12px; font-weight: 500;
+            padding: 6px 14px; cursor: pointer; transition: all 0.15s;
+            align-self: flex-start;
+        }
+        .btn-sync-now:hover { border-color: var(--accent); color: var(--accent); }
+        .btn-sync-now:disabled { opacity: 0.4; cursor: not-allowed; }
+        .btn-sync-now .sync-spinner {
+            display: none; width: 12px; height: 12px;
+            border: 2px solid var(--border); border-top-color: var(--accent);
+            border-radius: 50%; animation: spin 0.6s linear infinite;
+        }
+        .btn-sync-now.syncing .sync-spinner { display: inline-block; }
+        .btn-sync-now.syncing .sync-icon { display: none; }
+
+        .sync-poll-indicator {
+            font-size: 10px; color: var(--text-muted); text-align: right;
+            margin-top: 8px;
+        }
+
+        /* ── Logs tab ──────────────────────────────────────────────── */
+        .logs-toolbar {
+            display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 16px;
+        }
+        .logs-toolbar .mapping-filter-btn { /* reuse existing filter button style */ }
+        .log-refresh-btn {
+            margin-left: auto;
+            padding: 5px 14px; border-radius: 6px; border: 1px solid var(--border);
+            background: var(--surface); color: var(--text-muted); font-size: 12px;
+            font-family: inherit; cursor: pointer; transition: all 0.15s;
+        }
+        .log-refresh-btn:hover { background: var(--surface-hover); color: var(--text); border-color: var(--accent); }
+        .log-entry {
+            display: grid;
+            grid-template-columns: 140px 80px 80px 1fr;
+            gap: 12px; align-items: start;
+            padding: 10px 14px;
+            border-bottom: 1px solid var(--border);
+            font-size: 13px;
+        }
+        .log-entry:hover { background: var(--surface-hover); }
+        .log-ts { font-size: 11px; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+        .log-badge {
+            display: inline-block; font-size: 10px; font-weight: 600;
+            padding: 2px 8px; border-radius: 4px; text-transform: uppercase;
+            letter-spacing: 0.03em; white-space: nowrap;
+        }
+        .log-badge.ai { background: rgba(139,92,246,0.15); color: #a78bfa; }
+        .log-badge.auth { background: rgba(59,130,246,0.15); color: #60a5fa; }
+        .log-badge.sync { background: rgba(34,211,238,0.15); color: #22d3ee; }
+        .log-badge.settings { background: rgba(251,191,36,0.15); color: #fbbf24; }
+        .log-badge.integration { background: rgba(52,211,153,0.15); color: #34d399; }
+        .log-level {
+            display: inline-block; font-size: 10px; font-weight: 600;
+            padding: 2px 8px; border-radius: 4px; text-transform: uppercase;
+        }
+        .log-level.error { background: rgba(239,68,68,0.12); color: #f87171; }
+        .log-level.warning { background: rgba(251,191,36,0.12); color: #fbbf24; }
+        .log-level.info { background: rgba(148,163,184,0.12); color: #94a3b8; }
+        .log-title { font-weight: 500; color: var(--text); }
+        .log-detail {
+            grid-column: 1 / -1; font-size: 12px; color: var(--text-muted);
+            padding: 6px 0 2px 0; word-break: break-word;
+            font-family: 'SF Mono', Consolas, monospace;
+            background: rgba(0,0,0,0.15); padding: 8px 12px; border-radius: 6px;
+            margin-top: 4px;
+        }
+        .log-user { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+        .log-toggle-detail {
+            background: none; border: none; color: var(--accent); font-size: 11px;
+            cursor: pointer; padding: 0; margin-left: 8px;
+        }
+        .log-empty {
+            text-align: center; padding: 40px 20px; color: var(--text-muted); font-size: 13px;
+        }
+        .log-count { font-size: 11px; color: var(--text-muted); }
+        .log-pagination {
+            display: flex; justify-content: center; gap: 8px; margin-top: 12px;
+        }
+        .log-pagination button {
+            padding: 4px 12px; border-radius: 6px; border: 1px solid var(--border);
+            background: var(--surface); color: var(--text-muted); font-size: 12px;
+            font-family: inherit; cursor: pointer;
+        }
+        .log-pagination button:hover { background: var(--surface-hover); color: var(--text); }
+        .log-pagination button:disabled { opacity: 0.4; cursor: not-allowed; }
+        .log-sync-section { margin-top: 20px; }
+        .log-sync-section h3 {
+            font-size: 13px; font-weight: 600; color: var(--text-muted);
+            text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 8px;
+        }
+    </style>
+    <script>
+        (function(){
+            var t = null; try { t = localStorage.getItem('timeline-theme'); } catch(e) {}
+            if (t) document.documentElement.setAttribute('data-theme', t);
+        })();
+    </script>
+</head>
+<body>
+
+{% include '_nav.html' %}
+
+<div class="page">
+    <div class="page-header">
+        <h1>Administration</h1>
+        <div style="display:flex;gap:8px;">
+            <button class="btn-restart" id="btnReload" onclick="restartApp('soft')">
+                <span class="btn-icon">&#x21bb;</span>
+                <span class="spinner"></span>
+                <span class="btn-label">Reload Workers</span>
+            </button>
+            <button class="btn-restart" id="btnHardRestart" onclick="restartApp('hard')" style="border-color:var(--warning);">
+                <span class="btn-icon">&#x23FB;</span>
+                <span class="spinner"></span>
+                <span class="btn-label">Hard Restart</span>
+            </button>
+        </div>
+    </div>
+
+    <div class="admin-tabs" id="adminTabs">
+        <button class="admin-tab active" data-tab="permissions">Permissions</button>
+        <button class="admin-tab" data-tab="settings">Settings</button>
+        <button class="admin-tab" data-tab="sync">Sync Status</button>
+        <button class="admin-tab" data-tab="analytics">Analytics</button>
+        <!-- Mappings tab is added dynamically only when services are configured -->
+    </div>
+
+    <!-- ── Permissions tab ──────────────────────────────────────── -->
+    <div id="tab-permissions" class="tab-content active">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;">
+            <h2 style="font-size:16px;font-weight:600;margin:0;">Permissions</h2>
+            <span class="saving-indicator" id="savingIndicator">Saving...</span>
+        </div>
+        <div class="info-bar">
+            Access to this application is controlled by Microsoft Azure AD — only users assigned in Azure can sign in.
+            Use the toggles below to control which features each user can access. Changes take effect on their next page load.
+            Users seeded from ConnectWise members can be hidden if they won't use the app.
+        </div>
+        <div class="controls-bar" id="controlsBar">
+            <label>
+                <input type="checkbox" id="showHiddenToggle" onchange="toggleShowHidden()">
+                Show hidden users
+            </label>
+            <span class="user-count" id="userCount"></span>
+        </div>
+        <div id="tableContainer">
+            <div class="empty-state">Loading users...</div>
+        </div>
+    </div>
+
+    <!-- ── Settings tab ─────────────────────────────────────────── -->
+    <div id="tab-settings" class="tab-content">
+        <div id="settingsContainer">
+            <div class="empty-state" style="padding:20px 0;">Loading settings...</div>
+        </div>
+    </div>
+
+    <!-- ── Sync Status tab ──────────────────────────────────────── -->
+    <div id="tab-sync" class="tab-content">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+            <div>
+                <h2 style="font-size:16px;font-weight:600;margin:0 0 4px 0;">Sync Status</h2>
+                <p style="font-size:12px;color:var(--text-muted);margin:0;">
+                    Monitor data synchronisation across all connected services.
+                </p>
+            </div>
+            <span class="sync-poll-indicator" id="syncPollIndicator"></span>
+        </div>
+        <div class="sync-grid" id="syncGrid">
+            <div class="empty-state" style="grid-column:1/-1;">Loading sync status...</div>
+        </div>
+    </div>
+
+        <!-- ── Mappings tab ─────────────────────────────────────────── -->
+    <div id="tab-analytics" class="tab-content">
+        <div id="analyticsLoading" style="text-align:center;padding:40px;color:var(--text-muted);">Loading analytics...</div>
+        <div id="analyticsContent" style="display:none;">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+                <div class="stat-row" id="analyticsStats" style="display:flex;gap:12px;flex-wrap:wrap;"></div>
+                <a href="/analytics" style="font-size:13px;color:var(--accent);text-decoration:none;white-space:nowrap;padding-left:16px;">Full analytics &rarr;</a>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px;">
+                <div class="sync-card">
+                    <div class="sync-card-header"><span class="sync-card-title">Daily Activity (30 days)</span></div>
+                    <div id="analyticsDailyChart" style="display:flex;align-items:flex-end;gap:2px;height:120px;"></div>
+                </div>
+                <div class="sync-card">
+                    <div class="sync-card-header"><span class="sync-card-title">Hourly Distribution</span></div>
+                    <div id="analyticsHourlyChart" style="display:flex;align-items:flex-end;gap:1px;height:120px;"></div>
+                </div>
+            </div>
+            <div class="sync-card" style="margin-bottom:20px;">
+                <div class="sync-card-header">
+                    <span class="sync-card-title">Top Users</span>
+                </div>
+                <div id="analyticsUsers"></div>
+            </div>
+            <div class="sync-card">
+                <div class="sync-card-header">
+                    <span class="sync-card-title">Recent Queries</span>
+                </div>
+                <div id="analyticsRecent" style="max-height:400px;overflow-y:auto;"></div>
+            </div>
+        </div>
+    </div>
+
+    <div id="tab-mappings" class="tab-content">
+        <h2 style="font-size:16px;font-weight:600;margin:0 0 4px 0;">Customer Mappings</h2>
+        <p style="font-size:12px;color:var(--text-muted);margin-bottom:16px;">
+            Map ConnectWise companies to their accounts in other services.
+        </p>
+        <div class="mappings-toolbar" id="mappingsToolbar">
+            <input type="text" id="mappingSearch" placeholder="Search companies..." oninput="filterMappings()">
+            <div class="mapping-filter-btns" id="mappingFilterBtns">
+                <button class="mapping-filter-btn active" data-filter="all">All</button>
+                <button class="mapping-filter-btn" data-filter="unmapped">Unmapped</button>
+                <button class="mapping-filter-btn" data-filter="partial">Partial</button>
+                <button class="mapping-filter-btn" data-filter="mapped">Mapped</button>
+                <button class="mapping-filter-btn" data-filter="ignored">Ignored</button>
+            </div>
+            <div class="svc-filter-btns" id="svcFilterBtns"></div>
+            <span class="mapping-count" id="mappingCount"></span>
+            <button class="btn-accept-all toolbar-btn" id="autoMapExact" style="display:none" onclick="autoMapExactMatches()">Auto-map Exact Matches</button>
+            <button class="btn-accept-all toolbar-btn" id="acceptAllVisible" style="display:none" onclick="acceptAllVisible()">Accept All Visible</button>
+            <button class="btn-dismiss-all toolbar-btn" id="dismissAllVisible" style="display:none" onclick="dismissAllVisible()">Dismiss All Visible</button>
+        </div>
+        <div id="mappingsContainer">
+            <div class="empty-state">Loading mappings...</div>
+        </div>
+    </div>
+
+    <!-- ── Logs tab ────────────────────────────────────────────── -->
+    <div id="tab-logs" class="tab-content">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
+            <div>
+                <h2 style="font-size:16px;font-weight:600;margin:0 0 4px 0;">Diagnostics</h2>
+                <p style="font-size:12px;color:var(--text-muted);margin-bottom:12px;">
+                    Actionable events — AI errors, authentication failures, sync issues, and settings changes.
+                </p>
+            </div>
+        </div>
+        <div class="logs-toolbar" id="logsToolbar">
+            <div class="mapping-filter-btns" id="logCategoryBtns">
+                <button class="mapping-filter-btn active" data-cat="">All</button>
+                <button class="mapping-filter-btn" data-cat="ai">AI</button>
+                <button class="mapping-filter-btn" data-cat="auth">Auth</button>
+                <button class="mapping-filter-btn" data-cat="sync">Sync</button>
+                <button class="mapping-filter-btn" data-cat="settings">Settings</button>
+                <button class="mapping-filter-btn" data-cat="integration">Integration</button>
+            </div>
+            <div class="mapping-filter-btns" id="logLevelBtns">
+                <button class="mapping-filter-btn active" data-level="">All</button>
+                <button class="mapping-filter-btn" data-level="error">Errors</button>
+                <button class="mapping-filter-btn" data-level="warning">Warnings</button>
+                <button class="mapping-filter-btn" data-level="info">Info</button>
+            </div>
+            <span class="log-count" id="logCount"></span>
+            <button class="log-refresh-btn" id="logRefreshBtn" onclick="loadLogs()">Refresh</button>
+        </div>
+        <div class="users-table-wrap" id="logsContainer">
+            <div class="empty-state" style="padding:20px 0;">Select this tab to load events.</div>
+        </div>
+        <div class="log-pagination" id="logPagination" style="display:none;">
+            <button id="logPrevBtn" onclick="logsPagePrev()">&larr; Previous</button>
+            <button id="logNextBtn" onclick="logsPageNext()">Next &rarr;</button>
+        </div>
+    </div>
+</div>
+
+<script>
+(function() {
+    // ── Helpers ────────────────────────────────────────────────
+    function esc(s) {
+        if (!s) return '';
+        var d = document.createElement('div');
+        d.appendChild(document.createTextNode(s));
+        return d.innerHTML;
+    }
+    function formatDate(iso) {
+        if (!iso) return '';
+        try {
+            var d = new Date(iso);
+            return d.toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' });
+        } catch(e) { return iso; }
+    }
+
+    // ── Restart ───────────────────────────────────────────────
+    window.restartApp = function(mode) {
+        var isSoft = (mode !== 'hard');
+        var msg = isSoft
+            ? 'Reload all workers? Settings cache will be refreshed.'
+            : 'Hard restart the container? There will be ~5 seconds of downtime.';
+        if (!confirm(msg)) return;
+
+        var btn = document.getElementById(isSoft ? 'btnReload' : 'btnHardRestart');
+        var origLabel = btn.querySelector('.btn-label').textContent;
+        btn.classList.add('restarting');
+        btn.disabled = true;
+        btn.querySelector('.btn-label').textContent = isSoft ? 'Reloading…' : 'Restarting…';
+
+        fetch('/api/admin/restart', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest'},
+            body: JSON.stringify({ mode: mode })
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            if (data.ok) {
+                btn.querySelector('.btn-label').textContent = isSoft ? 'Reloaded' : 'Restarting…';
+                if (isSoft) {
+                    setTimeout(function() { location.reload(); }, 2000);
+                } else {
+                    btn.querySelector('.btn-label').textContent = 'Waiting…';
+                    pollUntilUp();
+                }
+            } else {
+                btn.querySelector('.btn-label').textContent = 'Failed';
+                btn.classList.remove('restarting');
+                btn.disabled = false;
+                setTimeout(function() { btn.querySelector('.btn-label').textContent = origLabel; }, 3000);
+            }
+        })
+        .catch(function() {
+            if (!isSoft) {
+                btn.querySelector('.btn-label').textContent = 'Waiting…';
+                pollUntilUp();
+            } else {
+                setTimeout(function() { location.reload(); }, 3000);
+            }
+        });
+    };
+
+    function pollUntilUp() {
+        var attempts = 0;
+        var maxAttempts = 30;
+        function check() {
+            attempts++;
+            fetch('/healthz', { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                if (data.ok) {
+                    location.reload();
+                } else if (attempts < maxAttempts) {
+                    setTimeout(check, 2000);
+                }
+            })
+            .catch(function() {
+                if (attempts < maxAttempts) {
+                    setTimeout(check, 2000);
+                } else {
+                    alert('Container did not come back up within 60 seconds. Check Docker logs.');
+                    location.reload();
+                }
+            });
+        }
+        setTimeout(check, 3000);
+    }
+
+    // ── Tab switching ──────────────────────────────────────────
+    window.switchTab = function(tabName) {
+        var panel = document.getElementById('tab-' + tabName);
+        var btn = document.querySelector('.admin-tab[data-tab="' + tabName + '"]');
+        if (!panel) return;  // tab doesn't exist — bail gracefully
+
+        document.querySelectorAll('.tab-content').forEach(function(el) { el.classList.remove('active'); });
+        document.querySelectorAll('.admin-tab').forEach(function(el) { el.classList.remove('active'); });
+        panel.classList.add('active');
+        if (btn) btn.classList.add('active');
+
+        history.replaceState(null, '', '#' + tabName);
+
+        if (tabName === 'mappings' && !mappingsLoaded) loadMappings();
+        if (tabName === 'sync' && !syncLoaded) loadSyncStatus();
+        if (tabName === 'analytics' && !analyticsLoaded) loadAnalytics();
+        if (tabName === 'logs' && !logsLoaded) loadLogs();
+    };
+
+    // Attach tab click handlers via delegation
+    document.getElementById('adminTabs').addEventListener('click', function(e) {
+        var btn = e.target.closest('.admin-tab');
+        if (btn && btn.dataset.tab) {
+            switchTab(btn.dataset.tab);
+        }
+    });
+
+    // ── Analytics tab ──────────────────────────────────────────
+    var analyticsLoaded = false;
+
+    function loadAnalytics() {
+        analyticsLoaded = true;
+        fetch('/api/admin/analytics', {
+            headers: { 'X-Requested-With': 'XMLHttpRequest' }
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            document.getElementById('analyticsLoading').style.display = 'none';
+            document.getElementById('analyticsContent').style.display = 'block';
+            if (!data.ok) return;
+
+            // Stats cards
+            var stats = [
+                { label: 'Total Queries', value: data.total, sub: 'all time' },
+                { label: 'Last 7 Days', value: data.total_7d, sub: 'recent' },
+                { label: 'Avg Response', value: data.avg_response + 's', sub: 'excl. errors', cls: 'success' },
+                { label: 'Error Rate', value: data.error_rate + '%', sub: data.total_errors + ' errors',
+                  cls: data.error_rate > 10 ? 'error' : data.error_rate > 5 ? 'warning' : 'success' },
+                { label: 'Suggested', value: data.sources.suggested || 0,
+                  sub: data.total > 0 ? Math.round(((data.sources.suggested||0)/data.total)*100) + '% of queries' : '' },
+            ];
+            var statsHtml = '';
+            stats.forEach(function(s) {
+                statsHtml += '<div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:12px 16px;flex:1;min-width:120px;">';
+                statsHtml += '<div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;font-weight:600;">' + esc(s.label) + '</div>';
+                statsHtml += '<div style="font-size:24px;font-weight:700;margin:4px 0;' + (s.cls ? 'color:var(--'+s.cls+')' : '') + '">' + esc(String(s.value)) + '</div>';
+                statsHtml += '<div style="font-size:11px;color:var(--text-muted);">' + esc(s.sub) + '</div></div>';
+            });
+            document.getElementById('analyticsStats').innerHTML = statsHtml;
+
+            // Daily chart (simple bar chart)
+            var dailyEl = document.getElementById('analyticsDailyChart');
+            if (data.daily && data.daily.length) {
+                var maxQ = Math.max.apply(null, data.daily.map(function(d) { return d.queries; }));
+                var dHtml = '';
+                data.daily.forEach(function(d) {
+                    var pct = maxQ > 0 ? (d.queries / maxQ * 100) : 0;
+                    dHtml += '<div style="flex:1;background:var(--accent);border-radius:2px 2px 0 0;min-height:2px;height:' + pct + '%" title="' + esc(d.day) + ': ' + d.queries + '"></div>';
+                });
+                dailyEl.innerHTML = dHtml;
+            } else {
+                dailyEl.innerHTML = '<div style="color:var(--text-muted);font-size:12px;">No data yet</div>';
+            }
+
+            // Hourly chart
+            var hourlyEl = document.getElementById('analyticsHourlyChart');
+            if (data.hourly) {
+                var maxH = Math.max.apply(null, data.hourly.map(function(h) { return h.queries; }));
+                var hHtml = '';
+                data.hourly.forEach(function(h) {
+                    var pct = maxH > 0 ? (h.queries / maxH * 100) : 0;
+                    hHtml += '<div style="flex:1;background:var(--success);border-radius:2px 2px 0 0;min-height:2px;height:' + pct + '%" title="' + h.hour + ':00 — ' + h.queries + ' queries"></div>';
+                });
+                hourlyEl.innerHTML = hHtml;
+            }
+
+            // Top users table
+            var usersEl = document.getElementById('analyticsUsers');
+            if (data.top_users && data.top_users.length) {
+                var uHtml = '<table style="width:100%;font-size:12px;border-collapse:collapse;">';
+                uHtml += '<tr style="border-bottom:1px solid var(--border);"><th style="text-align:left;padding:6px;font-weight:600;">User</th><th style="text-align:right;padding:6px;">Queries</th><th style="text-align:right;padding:6px;">Avg (s)</th><th style="text-align:right;padding:6px;">Errors</th></tr>';
+                data.top_users.forEach(function(u) {
+                    uHtml += '<tr style="border-bottom:1px solid var(--border);">';
+                    uHtml += '<td style="padding:6px;">' + esc(u.user_name || u.user_email || 'Unknown') + '</td>';
+                    uHtml += '<td style="text-align:right;padding:6px;">' + u.queries + '</td>';
+                    uHtml += '<td style="text-align:right;padding:6px;">' + (u.avg_secs || 0) + '</td>';
+                    uHtml += '<td style="text-align:right;padding:6px;' + (u.errors > 0 ? 'color:var(--error)' : '') + '">' + u.errors + '</td>';
+                    uHtml += '</tr>';
+                });
+                uHtml += '</table>';
+                usersEl.innerHTML = uHtml;
+            } else {
+                usersEl.innerHTML = '<div style="color:var(--text-muted);font-size:12px;padding:12px;">No usage data yet.</div>';
+            }
+
+            // Recent queries
+            var recentEl = document.getElementById('analyticsRecent');
+            if (data.recent && data.recent.length) {
+                var rHtml = '<table style="width:100%;font-size:12px;border-collapse:collapse;">';
+                rHtml += '<tr style="border-bottom:1px solid var(--border);"><th style="text-align:left;padding:6px;">User</th><th style="text-align:left;padding:6px;">Query</th><th style="text-align:right;padding:6px;">Time</th><th style="text-align:right;padding:6px;">Secs</th></tr>';
+                data.recent.forEach(function(r) {
+                    var q = r.query_text || '';
+                    if (q.length > 80) q = q.substring(0, 80) + '...';
+                    rHtml += '<tr style="border-bottom:1px solid var(--border);' + (r.errored ? 'color:var(--error);' : '') + '">';
+                    rHtml += '<td style="padding:6px;white-space:nowrap;">' + esc(r.user_name || 'Unknown') + '</td>';
+                    rHtml += '<td style="padding:6px;">' + esc(q) + '</td>';
+                    rHtml += '<td style="text-align:right;padding:6px;white-space:nowrap;font-size:10px;color:var(--text-muted);">' + esc(r.timestamp || '') + '</td>';
+                    rHtml += '<td style="text-align:right;padding:6px;">' + (r.secs || '—') + '</td>';
+                    rHtml += '</tr>';
+                });
+                rHtml += '</table>';
+                recentEl.innerHTML = rHtml;
+            }
+        })
+        .catch(function(e) {
+            document.getElementById('analyticsLoading').textContent = 'Failed to load analytics.';
+        });
+    }
+
+
+    // ── Logs tab ──────────────────────────────────────────────────
+    var logsLoaded = false;
+    var logsCategory = '';
+    var logsLevel = '';
+    var logsOffset = 0;
+    var logsLimit = 50;
+    var logsTotal = 0;
+
+    // Always show the Logs tab
+    (function() {
+        var existingTab = document.querySelector('.admin-tab[data-tab="logs"]');
+        if (!existingTab) {
+            var tab = document.createElement('button');
+            tab.className = 'admin-tab';
+            tab.dataset.tab = 'logs';
+            tab.textContent = 'Logs';
+            document.getElementById('adminTabs').appendChild(tab);
+        }
+    })();
+
+    // Category filter buttons
+    document.getElementById('logCategoryBtns').addEventListener('click', function(e) {
+        var btn = e.target.closest('.mapping-filter-btn');
+        if (!btn) return;
+        logsCategory = btn.dataset.cat || '';
+        logsOffset = 0;
+        document.querySelectorAll('#logCategoryBtns .mapping-filter-btn').forEach(function(b) {
+            b.classList.toggle('active', (b.dataset.cat || '') === logsCategory);
+        });
+        loadLogs();
+    });
+
+    // Level filter buttons
+    document.getElementById('logLevelBtns').addEventListener('click', function(e) {
+        var btn = e.target.closest('.mapping-filter-btn');
+        if (!btn) return;
+        logsLevel = btn.dataset.level || '';
+        logsOffset = 0;
+        document.querySelectorAll('#logLevelBtns .mapping-filter-btn').forEach(function(b) {
+            b.classList.toggle('active', (b.dataset.level || '') === logsLevel);
+        });
+        loadLogs();
+    });
+
+    window.logsPagePrev = function() {
+        logsOffset = Math.max(0, logsOffset - logsLimit);
+        loadLogs();
+    };
+
+    window.logsPageNext = function() {
+        if (logsOffset + logsLimit < logsTotal) {
+            logsOffset += logsLimit;
+            loadLogs();
+        }
+    };
+
+    window.loadLogs = function() {
+        logsLoaded = true;
+        var container = document.getElementById('logsContainer');
+        container.innerHTML = '<div class="empty-state" style="padding:20px 0;">Loading events...</div>';
+
+        var params = '?limit=' + logsLimit + '&offset=' + logsOffset;
+        if (logsCategory) params += '&category=' + logsCategory;
+        if (logsLevel) params += '&level=' + logsLevel;
+
+        fetch('/api/admin/events' + params, {
+            headers: { 'X-Requested-With': 'XMLHttpRequest' }
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            var events = data.events || [];
+            var syncErrors = data.sync_errors || [];
+            logsTotal = data.total || 0;
+
+            document.getElementById('logCount').textContent =
+                logsTotal + ' event' + (logsTotal !== 1 ? 's' : '') +
+                (logsOffset > 0 ? ' (showing ' + (logsOffset + 1) + '–' + Math.min(logsOffset + logsLimit, logsTotal) + ')' : '');
+
+            // Pagination
+            var pagEl = document.getElementById('logPagination');
+            pagEl.style.display = (logsTotal > logsLimit) ? 'flex' : 'none';
+            document.getElementById('logPrevBtn').disabled = logsOffset === 0;
+            document.getElementById('logNextBtn').disabled = logsOffset + logsLimit >= logsTotal;
+
+            if (!events.length && !syncErrors.length) {
+                container.innerHTML = '<div class="log-empty">No events recorded yet. Events appear here when AI errors, authentication issues, or configuration changes occur.</div>';
+                return;
+            }
+
+            var html = '';
+            events.forEach(function(evt) {
+                html += renderLogEntry(evt);
+            });
+
+            // Sync errors section (only on first page, no category filter or sync filter)
+            if (syncErrors.length && logsOffset === 0 && (!logsCategory || logsCategory === 'sync')) {
+                html += '<div class="log-sync-section"><h3>Active sync errors</h3>';
+                syncErrors.forEach(function(se) {
+                    html += renderLogEntry({
+                        timestamp: se.timestamp,
+                        category: 'sync',
+                        level: 'error',
+                        title: se.source + ' / ' + se.entity + ' sync failed',
+                        detail: se.error,
+                    });
+                });
+                html += '</div>';
+            }
+
+            container.innerHTML = html;
+        })
+        .catch(function(err) {
+            container.innerHTML = '<div class="empty-state">Error loading events: ' + err.message + '</div>';
+        });
+    };
+
+    function renderLogEntry(evt) {
+        var ts = evt.timestamp || '';
+        // Format timestamp for display
+        if (ts) {
+            try {
+                var d = new Date(ts + (ts.indexOf('Z') < 0 && ts.indexOf('+') < 0 ? 'Z' : ''));
+                ts = d.toLocaleString(undefined, {
+                    month: 'short', day: 'numeric', hour: 'numeric',
+                    minute: '2-digit', second: '2-digit',
+                });
+            } catch(e) {}
+        }
+
+        var cat = evt.category || 'unknown';
+        var level = evt.level || 'info';
+        var title = evt.title || '';
+        var detail = evt.detail || '';
+        var user = evt.user_email || '';
+        var id = evt.id || Math.random().toString(36).slice(2);
+
+        var html = '<div class="log-entry">';
+        html += '<span class="log-ts">' + esc(ts) + '</span>';
+        html += '<span><span class="log-badge ' + esc(cat) + '">' + esc(cat) + '</span></span>';
+        html += '<span><span class="log-level ' + esc(level) + '">' + esc(level) + '</span></span>';
+        html += '<span>';
+        html += '<span class="log-title">' + esc(title) + '</span>';
+        if (detail) {
+            html += '<button class="log-toggle-detail" onclick="toggleLogDetail(\'log-d-' + id + '\')">details</button>';
+        }
+        if (user) {
+            html += '<div class="log-user">' + esc(user) + '</div>';
+        }
+        html += '</span>';
+        if (detail) {
+            html += '<div class="log-detail" id="log-d-' + id + '" style="display:none;">' + esc(detail) + '</div>';
+        }
+        html += '</div>';
+        return html;
+    }
+
+    window.toggleLogDetail = function(id) {
+        var el = document.getElementById(id);
+        if (el) el.style.display = el.style.display === 'none' ? 'block' : 'none';
+    };
+
+    // Deferred: open tab from URL hash after dynamic tabs are inserted
+    // (called at the bottom of the script, after showMappingsTab)
+    window._applyHashTab = function() {
+        var hash = (location.hash || '').replace('#', '');
+        if (hash && document.getElementById('tab-' + hash)) {
+            switchTab(hash);
+        }
+    };
+
+    // ── Permissions ───────────────────────────────────────────
+    var allData = null;
+    var showHidden = false;
+
+    function fetchData() {
+        var url = '/api/admin/permissions';
+        if (showHidden) url += '?show_hidden=1';
+        fetch(url)
+            .then(function(r) { return r.json(); })
+            .then(function(data) { allData = data; render(); })
+            .catch(function(err) {
+                document.getElementById('tableContainer').innerHTML =
+                    '<div class="empty-state">Error: ' + err.message + '</div>';
+            });
+    }
+
+    window.toggleShowHidden = function() {
+        showHidden = document.getElementById('showHiddenToggle').checked;
+        fetchData();
+    };
+
+    function render() {
+        if (!allData) return;
+        var container = document.getElementById('tableContainer');
+        var users = allData.users || [];
+        var features = allData.features || [];
+
+        var activeCount = users.filter(function(u) { return !u.hidden; }).length;
+        var hiddenCount = users.filter(function(u) { return u.hidden; }).length;
+        var countEl = document.getElementById('userCount');
+        if (countEl) {
+            var text = activeCount + ' active user' + (activeCount !== 1 ? 's' : '');
+            if (hiddenCount > 0) text += ', ' + hiddenCount + ' hidden';
+            countEl.textContent = text;
+        }
+
+        if (users.length === 0) {
+            container.innerHTML = '<div class="empty-state">' +
+                (showHidden ? 'No users found.' : 'No active users found. Try showing hidden users.') + '</div>';
+            return;
+        }
+
+        var bulkExclude = ['admin'];
+        var visibleUsers = users.filter(function(u) { return !u.hidden; });
+
+        var html = '<div class="users-table-wrap"><table><thead><tr>';
+        html += '<th>User</th><th>Status</th><th>Last Seen</th>';
+        features.forEach(function(f) {
+            var featureLabels = { admin: 'Administration', timeline: 'Timeline' };
+            var label = esc(featureLabels[f] || f.charAt(0).toUpperCase() + f.slice(1));
+            if (bulkExclude.indexOf(f) === -1 && visibleUsers.length > 0) {
+                var enabledCount = visibleUsers.filter(function(u) { return u.features[f]; }).length;
+                var allOn = enabledCount === visibleUsers.length;
+                html += '<th class="feature-col">' + label +
+                    '<label class="toggle toggle-all" title="Toggle all users">' +
+                    '<input type="checkbox" ' + (allOn ? 'checked' : '') +
+                    ' onchange="toggleAllFeature(\'' + f + '\', this.checked)">' +
+                    '<span class="slider"></span></label></th>';
+            } else {
+                html += '<th class="feature-col">' + label + '</th>';
+            }
+        });
+        html += '<th></th></tr></thead><tbody>';
+
+        users.forEach(function(u) {
+            var rowClass = u.hidden ? ' class="row-hidden"' : '';
+            html += '<tr' + rowClass + '>';
+            html += '<td><span class="user-name">' + esc(u.name) + '</span><br>' +
+                    '<span class="user-email">' + esc(u.email) + '</span></td>';
+            html += '<td>' + (u.activated
+                ? '<span class="badge-activated yes">Activated</span>'
+                : '<span class="badge-activated no">Not signed in</span>') + '</td>';
+            html += '<td class="last-seen">' + formatDate(u.last_seen) + '</td>';
+
+            features.forEach(function(f) {
+                var checked = u.features[f] ? 'checked' : '';
+                html += '<td class="feature-col"><label class="toggle">' +
+                    '<input type="checkbox" ' + checked +
+                    ' onchange="toggleFeature(\'' + esc(u.email).replace(/'/g, "\\'") +
+                    '\', \'' + f + '\', this.checked)">' +
+                    '<span class="slider"></span></label></td>';
+            });
+
+            html += '<td>';
+            if (u.hidden) {
+                html += '<button class="btn-hide" onclick="hideUser(\'' +
+                    esc(u.email).replace(/'/g, "\\'") + '\', false)">Unhide</button>';
+            } else {
+                html += '<button class="btn-hide" onclick="hideUser(\'' +
+                    esc(u.email).replace(/'/g, "\\'") + '\', true)">Hide</button>';
+            }
+            html += '</td></tr>';
+        });
+
+        html += '</tbody></table></div>';
+        container.innerHTML = html;
+    }
+
+    window.toggleFeature = function(email, feature, enabled) {
+        var indicator = document.getElementById('savingIndicator');
+        indicator.classList.add('visible');
+        fetch('/api/admin/permissions', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+            body: JSON.stringify({ email: email, feature: feature, enabled: enabled })
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            indicator.classList.remove('visible');
+            if (!data.ok) { alert('Failed to update: ' + (data.error || 'unknown')); fetchData(); }
+        })
+        .catch(function() { indicator.classList.remove('visible'); alert('Network error'); fetchData(); });
+    };
+
+    window.hideUser = function(email, hidden) {
+        var indicator = document.getElementById('savingIndicator');
+        indicator.classList.add('visible');
+        fetch('/api/admin/permissions/hide', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+            body: JSON.stringify({ email: email, hidden: hidden })
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            indicator.classList.remove('visible');
+            if (data.ok) fetchData(); else alert('Failed: ' + (data.error || 'unknown'));
+        })
+        .catch(function() { indicator.classList.remove('visible'); alert('Network error'); fetchData(); });
+    };
+
+    window.toggleAllFeature = function(feature, enabled) {
+        if (!allData) return;
+        var users = allData.users || [];
+        var toToggle = users.filter(function(u) { return !u.hidden && !!u.features[feature] !== enabled; });
+        if (toToggle.length === 0) return;
+        var indicator = document.getElementById('savingIndicator');
+        indicator.classList.add('visible');
+        var pending = toToggle.length, failed = 0;
+        toToggle.forEach(function(u) {
+            u.features[feature] = enabled;
+            fetch('/api/admin/permissions', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+                body: JSON.stringify({ email: u.email, feature: feature, enabled: enabled })
+            })
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                if (!data.ok) failed++;
+                if (--pending === 0) {
+                    indicator.classList.remove('visible');
+                    if (failed > 0) { alert(failed + ' update(s) failed'); fetchData(); }
+                    else render();
+                }
+            })
+            .catch(function() {
+                failed++;
+                if (--pending === 0) { indicator.classList.remove('visible'); alert(failed + ' failed'); fetchData(); }
+            });
+        });
+    };
+
+    fetchData();
+
+    // ── Settings panel (card layout) ────────────────────────────
+    (function() {
+        var settingsContainer = document.getElementById('settingsContainer');
+
+        function loadSettings() {
+            fetch('/api/admin/settings', { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+            .then(function(r) { return r.json(); })
+            .then(function(data) { renderSettings(data); })
+            .catch(function() {
+                settingsContainer.innerHTML = '<div class="empty-state">Failed to load settings.</div>';
+            });
+        }
+
+        function renderSettings(data) {
+            var settings = data.settings || [];
+            var envOverride = data.env_override;
+            var html = '';
+
+            if (envOverride) {
+                var overrideDocsUrl = data.env_override_docs_url || '';
+                var docsLink = overrideDocsUrl
+                    ? ' <a href="' + overrideDocsUrl + '" target="_blank" rel="noopener" style="color:inherit;text-decoration:underline;">Learn more</a>'
+                    : '';
+                html += '<div class="env-override-banner">' +
+                    '<strong>ENV_OVERRIDE is active</strong> — environment variables have been saved to the database and take precedence. ' +
+                    'Remove ENV_OVERRIDE from your .env and restart to resume managing settings from this page.' +
+                    docsLink +
+                    '</div>';
+            }
+
+            var general = settings.filter(function(s) { return !s.group; });
+            var grouped = settings.filter(function(s) { return !!s.group; });
+
+            // Group by service/feature
+            var groups = {};
+            var groupOrder = [];
+            grouped.forEach(function(s) {
+                if (!groups[s.group]) { groups[s.group] = []; groupOrder.push(s.group); }
+                groups[s.group].push(s);
+            });
+
+            // Compute per-group status and classify as integration vs feature
+            var groupStatus = {};
+            var integrationGroups = [];
+            var featureGroups = [];
+            groupOrder.forEach(function(g) {
+                var allSet = true, hasSecrets = false;
+                groups[g].forEach(function(s) {
+                    if (s.type === 'secret') { hasSecrets = true; if (!s.has_value) allSet = false; }
+                });
+                groupStatus[g] = { allSet: allSet, hasSecrets: hasSecrets };
+                if (hasSecrets) { integrationGroups.push(g); }
+                else { featureGroups.push(g); }
+            });
+
+            function renderRow(s) {
+                var inputType = (s.type === 'secret') ? 'password' : 'text';
+                var rawVal = (s.value !== null && s.value !== undefined) ? String(s.value) : '';
+                var desc = s.description || '';
+                var row = '<div class="setting-row">';
+                // Store validation rules for client-side use
+                if (s.validate) _settingsValidation[s.key] = s.validate;
+
+                row += '<div><div class="setting-label">' + esc(s.label) + '</div>';
+                if (desc) row += '<div class="setting-desc">' + esc(desc) + '</div>';
+                if (s.help_url) row += '<a href="' + esc(s.help_url) + '" target="_blank" rel="noopener" class="setting-help-link" title="Documentation">ℹ️ Learn more</a>';
+                row += '<div class="setting-env">' + esc(s.env_var) + '</div></div>';
+                row += '<input type="' + inputType + '" class="setting-input" ' +
+                       'id="setting-' + s.key + '" ' +
+                       'placeholder="' + (s.type === 'secret' ? 'Not configured' : '') + '" ' +
+                       'value="' + esc(rawVal).replace(/"/g, '&quot;') + '" ' +
+                       (s.validate ? 'oninput="validateField(\'' + s.key + '\')" ' : '') +
+                       (envOverride ? 'disabled' : '') + '>';
+                row += '<div id="setting-action-' + s.key + '">' +
+                       (envOverride ? '' :
+                       '<button class="setting-save" onclick="saveSetting(\'' + s.key + '\')">Save</button>') +
+                       '</div>';
+                if (s.auto_detected) {
+                    row += '<div class="setting-auto-detected">Auto-detected via Graph API</div>';
+                }
+                row += '<div class="setting-error" id="setting-err-' + s.key + '"></div>';
+                row += '</div>';
+                return row;
+            }
+
+            // ── General Settings card ──
+            if (general.length > 0) {
+                html += '<div class="settings-card">';
+                html += '<div class="settings-card-header">';
+                html += '<div><div class="settings-card-title">General Settings</div>';
+                html += '<div class="settings-card-desc">Core application settings. Changes take effect within 30 seconds.</div></div>';
+                html += '</div>';
+                html += '<div class="settings-grid">';
+                general.forEach(function(s) { html += renderRow(s); });
+                html += '</div></div>';
+            }
+
+            // ── Feature Settings cards (non-credential groups like Timeline) ──
+            if (featureGroups.length > 0) {
+                featureGroups.forEach(function(g) {
+                    html += '<div class="settings-card">';
+                    html += '<div class="settings-card-header">';
+                    html += '<div><div class="settings-card-title">' + esc(g) + '</div>';
+                    html += '<div class="settings-card-desc">Configure ' + esc(g).toLowerCase() + ' behaviour. Changes take effect within 30 seconds.</div></div>';
+                    html += '</div>';
+                    html += '<div class="settings-grid">';
+                    groups[g].forEach(function(s) { html += renderRow(s); });
+                    html += '</div></div>';
+                });
+            }
+
+            // ── Integration cards — one per service ──
+            if (integrationGroups.length > 0) {
+                html += '<div class="settings-section-title">Integration Credentials</div>';
+                integrationGroups.forEach(function(g) {
+                    var status = groupStatus[g];
+                    var statusClass = (status.hasSecrets && status.allSet) ? 'configured' : 'not-configured';
+                    var statusLabel = (status.hasSecrets && status.allSet) ? 'Configured' : 'Not configured';
+
+                    html += '<div class="settings-card">';
+                    html += '<div class="settings-card-header">';
+                    html += '<div class="settings-card-title">' + esc(g) + '</div>';
+                    html += '<span class="service-status ' + statusClass + '">' +
+                            '<span class="dot"></span>' + statusLabel + '</span>';
+                    html += '</div>';
+                    html += '<div class="settings-grid">';
+                    groups[g].forEach(function(s) { html += renderRow(s); });
+                    html += '</div>';
+                    // Add Test Connection button if service is known
+                    var svcKey = SERVICE_KEYS[g];
+                    if (svcKey && !envOverride) {
+                        html += '<div style="padding: 4px 16px 12px; border-top: 1px solid var(--border); margin-top: 4px;">';
+                        html += '<button class="setting-test" id="test-btn-' + svcKey + '" onclick="testConnection(\'' + svcKey + '\')">Test Connection</button>';
+                        html += '<div class="test-result" id="test-result-' + svcKey + '"></div>';
+                        html += '</div>';
+                    }
+                    html += '</div>';
+                });
+            }
+
+            settingsContainer.innerHTML = html;
+        }
+
+        // ── Client-side validation ──
+        var _settingsValidation = {};  // populated by renderSettings
+
+        function validateField(key) {
+            var rules = _settingsValidation[key];
+            if (!rules) return { ok: true };
+            var input = document.getElementById('setting-' + key);
+            if (!input) return { ok: true };
+            var v = input.value.trim();
+
+            // Allow empty for optional fields
+            if (rules.allow_empty && !v) {
+                input.classList.remove('invalid');
+                var errEl = document.getElementById('setting-err-' + key);
+                if (errEl) errEl.textContent = '';
+                return { ok: true };
+            }
+
+            var error = null;
+            if (rules.type === 'integer') {
+                var n = parseInt(v, 10);
+                if (isNaN(n) || String(n) !== v) error = 'Must be a whole number.';
+                else if (rules.min !== undefined && n < rules.min) error = 'Must be at least ' + rules.min + '.';
+                else if (rules.max !== undefined && n > rules.max) error = 'Must be at most ' + rules.max + '.';
+            } else if (rules.type === 'url') {
+                if (v && !/^https?:\/\/.+/.test(v)) error = 'Must start with https:// or http://.';
+            } else if (rules.type === 'guid') {
+                if (v && !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v))
+                    error = 'Must be a valid GUID (e.g. 12345678-abcd-1234-abcd-123456789abc).';
+            } else if (rules.type === 'hostname') {
+                if (v && !/^[a-zA-Z0-9][a-zA-Z0-9\-\.]*[a-zA-Z0-9]$/.test(v))
+                    error = 'Must be a valid hostname.';
+            } else if (rules.type === 'choice') {
+                if (rules.choices && rules.choices.indexOf(v) === -1)
+                    error = 'Must be one of: ' + rules.choices.join(', ') + '.';
+            }
+
+            var errEl = document.getElementById('setting-err-' + key);
+            if (error) {
+                input.classList.add('invalid');
+                if (errEl) errEl.textContent = error;
+                return { ok: false, error: error };
+            } else {
+                input.classList.remove('invalid');
+                if (errEl) errEl.textContent = '';
+                return { ok: true };
+            }
+        }
+
+        window.validateField = validateField;
+
+        window.saveSetting = function(key) {
+            var input = document.getElementById('setting-' + key);
+            var actionEl = document.getElementById('setting-action-' + key);
+            if (!input) return;
+
+            // Client-side validation first
+            var result = validateField(key);
+            if (!result.ok) return;
+
+            var btn = actionEl.querySelector('.setting-save');
+            if (btn) { btn.disabled = true; btn.textContent = 'Saving...'; }
+
+            fetch('/api/admin/settings', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+                body: JSON.stringify({ key: key, value: input.value })
+            })
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                if (data.ok) {
+                    actionEl.innerHTML = '<span class="setting-saved">Saved</span>';
+                    setTimeout(function() {
+                        actionEl.innerHTML =
+                            '<button class="setting-save" onclick="saveSetting(\'' + key + '\')">Save</button>';
+                    }, 2000);
+                } else {
+                    var errEl = document.getElementById('setting-err-' + key);
+                    if (errEl) errEl.textContent = data.error || 'Save failed';
+                    input.classList.add('invalid');
+                    if (btn) { btn.disabled = false; btn.textContent = 'Save'; }
+                }
+            })
+            .catch(function() {
+                var errEl = document.getElementById('setting-err-' + key);
+                if (errEl) errEl.textContent = 'Network error';
+                if (btn) { btn.disabled = false; btn.textContent = 'Save'; }
+            });
+        };
+
+        // ── Test Connection ──
+        var SERVICE_KEYS = {
+            'CIPP / Microsoft 365': 'cipp',
+            'Duo Security': 'duo',
+            'Huntress EDR': 'huntress',
+            'ThreatLocker': 'threatlocker'
+        };
+
+        window.testConnection = function(service) {
+            var btn = document.getElementById('test-btn-' + service);
+            var resultEl = document.getElementById('test-result-' + service);
+            if (!btn || !resultEl) return;
+            btn.disabled = true;
+            btn.textContent = 'Testing...';
+            resultEl.className = 'test-result';
+            resultEl.textContent = '';
+
+            fetch('/api/admin/test-connection', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+                body: JSON.stringify({ service: service })
+            })
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                resultEl.className = 'test-result ' + (data.ok ? 'success' : 'error');
+                btn.disabled = false;
+                btn.textContent = 'Test Connection';
+                if (data.ok) {
+                    var sourceKey = service;
+                    resultEl.innerHTML = esc(data.message || 'Connected') +
+                        (sourceKey ? ' <button class="setting-test" style="margin-top:0;margin-left:8px;padding:4px 10px;font-size:11px;" ' +
+                        'onclick="triggerFirstSync(\'' + sourceKey + '\', this)">Run Sync Now</button>' : '');
+                } else {
+                    resultEl.textContent = data.message || 'Failed';
+                }
+            })
+            .catch(function() {
+                resultEl.className = 'test-result error';
+                resultEl.textContent = 'Network error';
+                btn.disabled = false;
+                btn.textContent = 'Test Connection';
+            });
+        };
+
+        window.triggerFirstSync = function(sourceKey, btn) {
+            btn.disabled = true;
+            btn.textContent = 'Starting...';
+            fetch('/api/sync', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+                body: JSON.stringify({ source: sourceKey })
+            })
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                if (data.ok) {
+                    btn.textContent = 'Sync started';
+                    btn.style.color = 'var(--success)';
+                    btn.style.borderColor = 'var(--success)';
+                } else {
+                    btn.textContent = data.error || 'Failed';
+                    btn.style.color = 'var(--danger)';
+                    btn.style.borderColor = 'var(--danger)';
+                    btn.disabled = false;
+                }
+            })
+            .catch(function() {
+                btn.textContent = 'Error';
+                btn.disabled = false;
+            });
+        };
+
+        loadSettings();
+    })();
+
+    // ── Mappings panel ──────────────────────────────────────────
+    var mappingsLoaded = false;
+
+    // ── Sync Status panel ──────────────────────────────────────
+    var syncLoaded = false;
+    var syncPollTimer = null;
+    var syncAnySyncing = false;
+
+    var SOURCE_TABLE_LABELS = {
+        tickets: 'Tickets', time_entries: 'Time Entries', agreements: 'Agreements',
+        companies: 'Companies', members: 'Members', contacts: 'Contacts',
+        configurations: 'Configurations', projects: 'Projects', invoices: 'Invoices',
+        ticket_notes: 'Ticket Notes',
+        cipp_tenants: 'Tenants', cipp_licenses: 'Licenses', cipp_alerts: 'Alerts',
+        cipp_policies: 'Policies',
+        duo_users: 'Users', duo_accounts: 'Accounts',
+        huntress_organizations: 'Organizations', huntress_agents: 'Agents',
+        huntress_incidents: 'Incidents',
+        threatlocker_organizations: 'Organizations',
+        threatlocker_computers: 'Computers'
+    };
+
+    var SOURCE_TABLES = {
+        cw: ['tickets','time_entries','agreements','companies','members','contacts','configurations','projects','invoices','ticket_notes'],
+        cipp: ['cipp_tenants','cipp_licenses','cipp_alerts','cipp_policies'],
+        duo: ['duo_users','duo_accounts'],
+        huntress: ['huntress_organizations','huntress_agents','huntress_incidents'],
+        threatlocker: ['threatlocker_organizations', 'threatlocker_computers'],
+    };
+
+    function formatSyncTime(iso) {
+        if (!iso) return 'Never';
+        try {
+            var d = new Date(iso);
+            var now = new Date();
+            var diff = (now - d) / 1000;
+            if (diff < 60) return 'Just now';
+            if (diff < 3600) return Math.floor(diff / 60) + 'm ago';
+            if (diff < 86400) return Math.floor(diff / 3600) + 'h ago';
+            return d.toLocaleDateString('en-AU', { day: 'numeric', month: 'short' }) +
+                   ' ' + d.toLocaleTimeString('en-AU', { hour: '2-digit', minute: '2-digit' });
+        } catch(e) { return iso; }
+    }
+
+    function formatDuration(sec) {
+        if (!sec && sec !== 0) return '—';
+        if (sec < 60) return Math.round(sec) + 's';
+        return Math.floor(sec / 60) + 'm ' + Math.round(sec % 60) + 's';
+    }
+
+    function loadSyncStatus() {
+        fetch('/api/sync/status', { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            syncLoaded = true;
+            syncAnySyncing = data.syncing;
+            renderSyncGrid(data);
+            scheduleSyncPoll();
+        })
+        .catch(function(err) {
+            document.getElementById('syncGrid').innerHTML =
+                '<div class="empty-state" style="grid-column:1/-1;">Error loading sync status: ' + esc(err.message) + '</div>';
+        });
+    }
+
+    function scheduleSyncPoll() {
+        if (syncPollTimer) clearTimeout(syncPollTimer);
+        var interval = syncAnySyncing ? 5000 : 30000;
+        var indicator = document.getElementById('syncPollIndicator');
+        if (indicator) indicator.textContent = syncAnySyncing ? 'Polling every 5s' : '';
+        syncPollTimer = setTimeout(function() {
+            var syncTab = document.getElementById('tab-sync');
+            if (syncTab && syncTab.classList.contains('active')) {
+                loadSyncStatus();
+            }
+        }, interval);
+    }
+
+    function getSourceStatus(key, sourceData, entities) {
+        if (sourceData.syncing) return 'running';
+        var srcEntities = entities.filter(function(e) { return e.source === key; });
+        var hasError = srcEntities.some(function(e) { return e.last_status === 'error'; });
+        if (hasError) return 'error';
+        if (sourceData.last_sync) return 'ok';
+        return 'idle';
+    }
+
+    function renderSyncGrid(data) {
+        var grid = document.getElementById('syncGrid');
+        var sources = data.sources || {};
+        var entities = data.entities || [];
+        var liveCounts = data.live_counts || {};
+
+        var keys = Object.keys(sources);
+        if (keys.length === 0) {
+            grid.innerHTML = '<div class="empty-state" style="grid-column:1/-1;">' +
+                'No sync sources configured. Add integration credentials in the Settings tab.</div>';
+            return;
+        }
+
+        var html = '';
+        keys.forEach(function(key) {
+            var src = sources[key];
+            var status = getSourceStatus(key, src, entities);
+            var statusLabels = { ok: 'OK', error: 'Error', running: 'Syncing', idle: 'Not synced' };
+            var srcEntities = entities.filter(function(e) { return e.source === key; });
+            var tables = SOURCE_TABLES[key] || [];
+
+            html += '<div class="sync-card">';
+
+            // Header
+            html += '<div class="sync-card-header">';
+            html += '<span class="sync-card-title">' + esc(src.label) + '</span>';
+            html += '<span class="sync-status-pill ' + status + '">' +
+                    '<span class="dot"></span>' + statusLabels[status] + '</span>';
+            html += '</div>';
+
+            // Meta row
+            html += '<div class="sync-meta">';
+            html += '<div class="sync-meta-item"><span class="sync-meta-label">Last Sync</span>' +
+                    '<span class="sync-meta-value">' + formatSyncTime(src.last_sync) + '</span></div>';
+            html += '<div class="sync-meta-item"><span class="sync-meta-label">Duration</span>' +
+                    '<span class="sync-meta-value">' + formatDuration(src.last_duration) + '</span></div>';
+
+            // Total records across all tables for this source
+            var totalRecords = 0;
+            tables.forEach(function(t) { totalRecords += (liveCounts[t] || 0); });
+            html += '<div class="sync-meta-item"><span class="sync-meta-label">Total Records</span>' +
+                    '<span class="sync-meta-value">' + totalRecords.toLocaleString() + '</span></div>';
+            html += '</div>';
+
+            // Per-table record counts
+            if (tables.length > 0) {
+                html += '<div class="sync-entities">';
+                tables.forEach(function(t) {
+                    var count = liveCounts[t] || 0;
+                    var label = SOURCE_TABLE_LABELS[t] || t;
+                    // Check for entity-level errors
+                    var entityRow = srcEntities.find(function(e) { return e.entity === t; });
+                    var statusClass = entityRow && entityRow.last_status === 'error' ? 'error' : 'ok';
+
+                    html += '<div class="sync-entity-row">';
+                    html += '<span class="sync-entity-name">';
+                    if (entityRow) html += '<span class="sync-entity-status ' + statusClass + '"></span>';
+                    html += label + '</span>';
+                    html += '<span class="sync-entity-count">' + count.toLocaleString() + '</span>';
+                    html += '</div>';
+
+                    if (entityRow && entityRow.last_status === 'error' && entityRow.last_error) {
+                        html += '<div class="sync-entity-error">' + esc(entityRow.last_error) + '</div>';
+                    }
+                });
+                html += '</div>';
+            }
+
+            // Sync Now button
+            html += '<button class="btn-sync-now' + (src.syncing ? ' syncing' : '') + '" ' +
+                    'data-source="' + esc(key) + '" ' +
+                    (src.syncing ? 'disabled' : '') + '>' +
+                    '<span class="sync-icon">&#x21bb;</span>' +
+                    '<span class="sync-spinner"></span>' +
+                    (src.syncing ? 'Syncing...' : 'Sync Now') +
+                    '</button>';
+
+            html += '</div>';
+        });
+
+        grid.innerHTML = html;
+
+        // Attach Sync Now handlers
+        grid.querySelectorAll('.btn-sync-now').forEach(function(btn) {
+            btn.addEventListener('click', function() {
+                var source = btn.dataset.source;
+                btn.classList.add('syncing');
+                btn.disabled = true;
+                btn.innerHTML = '<span class="sync-icon">&#x21bb;</span>' +
+                                '<span class="sync-spinner"></span>Syncing...';
+                fetch('/api/sync', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+                    body: JSON.stringify({ source: source })
+                })
+                .then(function(r) { return r.json(); })
+                .then(function(data) {
+                    if (data.ok) {
+                        syncAnySyncing = true;
+                        scheduleSyncPoll();
+                        setTimeout(loadSyncStatus, 2000);
+                    } else {
+                        alert('Sync failed: ' + (data.error || 'unknown'));
+                        btn.classList.remove('syncing');
+                        btn.disabled = false;
+                        btn.innerHTML = '<span class="sync-icon">&#x21bb;</span>' +
+                                        '<span class="sync-spinner"></span>Sync Now';
+                    }
+                })
+                .catch(function() {
+                    alert('Network error');
+                    btn.classList.remove('syncing');
+                    btn.disabled = false;
+                    btn.innerHTML = '<span class="sync-icon">&#x21bb;</span>' +
+                                    '<span class="sync-spinner"></span>Sync Now';
+                });
+            });
+        });
+    }
+    var mappingsData = null;
+    var suggestionsData = null;
+    var mappingFilter = 'all';
+    var svcFilter = null; // null = all services
+
+    function loadMappings() {
+        Promise.all([
+            fetch('/api/admin/mappings', {headers: {'X-Requested-With': 'XMLHttpRequest'}}).then(function(r){return r.json();}),
+            fetch('/api/admin/mappings/suggest', {headers: {'X-Requested-With': 'XMLHttpRequest'}}).then(function(r){return r.json();})
+        ]).then(function(results) {
+            mappingsData = results[0];
+            suggestionsData = results[1];
+            mappingsLoaded = true;
+
+            // Dynamically add service filter buttons
+            var targets = mappingsData.targets || {};
+            var svcContainer = document.getElementById('svcFilterBtns');
+            var svcHtml = '';
+            for (var svc in targets) {
+                svcHtml += '<button class="svc-filter-btn" data-svc="' + esc(svc) + '">' + esc(svc) + '</button>';
+            }
+            svcContainer.innerHTML = svcHtml;
+
+            // Attach click handlers
+            svcContainer.querySelectorAll('.svc-filter-btn').forEach(function(btn) {
+                btn.addEventListener('click', function() {
+                    var clicked = btn.dataset.svc;
+                    if (svcFilter === clicked) {
+                        svcFilter = null; // toggle off
+                        btn.classList.remove('active');
+                    } else {
+                        svcFilter = clicked;
+                        svcContainer.querySelectorAll('.svc-filter-btn').forEach(function(b) { b.classList.remove('active'); });
+                        btn.classList.add('active');
+                    }
+                    renderMappings();
+                });
+            });
+
+            renderMappings();
+        }).catch(function(err) {
+            document.getElementById('mappingsContainer').innerHTML =
+                '<div class="empty-state">Error loading mappings: ' + err.message + '</div>';
+        });
+    }
+
+    // Show/hide Mappings tab based on whether any targets exist
+    // We check after the API returns, but also on page load via template flags
+    function showMappingsTab() {
+        var existingTab = document.querySelector('.admin-tab[data-tab="mappings"]');
+        if (!existingTab) {
+            var tab = document.createElement('button');
+            tab.className = 'admin-tab';
+            tab.dataset.tab = 'mappings';
+            tab.textContent = 'Mappings';
+            document.getElementById('adminTabs').appendChild(tab);
+        }
+    }
+
+    // Show mappings tab if any service is configured (server-side check)
+    {% if cipp_enabled or duo_enabled or huntress_enabled or threatlocker_enabled %}
+    showMappingsTab();
+    {% endif %}
+
+    // Apply URL hash now that all dynamic tabs are in place
+    _applyHashTab();
+
+    // Attach mapping filter button handlers
+    document.getElementById('mappingFilterBtns').addEventListener('click', function(e) {
+        var btn = e.target.closest('.mapping-filter-btn');
+        if (!btn) return;
+        mappingFilter = btn.dataset.filter;
+        document.querySelectorAll('.mapping-filter-btn').forEach(function(b) {
+            b.classList.toggle('active', b.dataset.filter === mappingFilter);
+        });
+        renderMappings();
+    });
+
+    window.filterMappings = function() { renderMappings(); };
+
+    function getSuggestion(companyId) {
+        if (!suggestionsData || !suggestionsData.suggestions) return null;
+        for (var i = 0; i < suggestionsData.suggestions.length; i++) {
+            if (suggestionsData.suggestions[i].company_id == companyId) return suggestionsData.suggestions[i].matches;
+        }
+        return null;
+    }
+
+    function isMapped(mapping, targets) {
+        if (!mapping) return false;
+        for (var svc in targets) {
+            var col = targets[svc].column;
+            if (!mapping[col]) return false;
+        }
+        return true;
+    }
+
+    function mappedCount(mapping, targets) {
+        // Count how many services are mapped for this company
+        var count = 0;
+        if (!mapping) return 0;
+        for (var svc in targets) {
+            if (mapping[targets[svc].column]) count++;
+        }
+        return count;
+    }
+
+    function isMappedForService(mapping, targets, svc) {
+        if (!mapping || !targets[svc]) return false;
+        return !!mapping[targets[svc].column];
+    }
+
+    function renderMappings() {
+        if (!mappingsData) return;
+        var container = document.getElementById('mappingsContainer');
+        var companies = mappingsData.companies || [];
+        var targets = mappingsData.targets || {};
+        var search = (document.getElementById('mappingSearch').value || '').toLowerCase();
+
+        var targetKeys = Object.keys(targets);
+        if (targetKeys.length === 0) {
+            container.innerHTML = '<div class="empty-state">' +
+                'No integration services are configured. Add API credentials in the Settings tab to enable mapping.' +
+                '</div>';
+            return;
+        }
+
+        // Also dynamically show the mappings tab if API returned targets
+        if (targetKeys.length > 0) showMappingsTab();
+
+        var totalKeys = Object.keys(targets).length;
+        var filtered = companies.filter(function(c) {
+            if (search && c.name.toLowerCase().indexOf(search) === -1) return false;
+            var isIgnored = c.mapping && c.mapping.mapping_ignored;
+            var mapped = isMapped(c.mapping, targets);
+            var mc = mappedCount(c.mapping, targets);
+            var partial = mc > 0 && mc < totalKeys;
+
+            // Default "all" filter hides ignored companies
+            if (mappingFilter === 'all' && isIgnored) return false;
+            if (mappingFilter === 'mapped' && !mapped) return false;
+            if (mappingFilter === 'unmapped' && (mapped || isIgnored)) return false;
+            if (mappingFilter === 'partial' && (!partial || isIgnored)) return false;
+            if (mappingFilter === 'ignored' && !isIgnored) return false;
+
+            // Service filter: show only companies where the selected service is unmapped
+            if (svcFilter && !isIgnored) {
+                if (!isMappedForService(c.mapping, targets, svcFilter)) return true;
+                if (mappingFilter === 'unmapped') return false;
+                return true;
+            }
+            return true;
+        });
+
+        var totalMapped = companies.filter(function(c) { return isMapped(c.mapping, targets); }).length;
+        var totalIgnored = companies.filter(function(c) { return c.mapping && c.mapping.mapping_ignored; }).length;
+        var activeCount = companies.length - totalIgnored;
+        document.getElementById('mappingCount').textContent =
+            totalMapped + ' of ' + activeCount + ' fully mapped' +
+            (totalIgnored ? ' (' + totalIgnored + ' ignored)' : '');
+
+        if (filtered.length === 0) {
+            container.innerHTML = '<div class="empty-state">' +
+                (search ? 'No companies match "' + esc(search) + '"' : 'No companies match the current filter.') + '</div>';
+            return;
+        }
+
+        var html = '';
+        filtered.forEach(function(c) {
+            var mapped = isMapped(c.mapping, targets);
+            var mc = mappedCount(c.mapping, targets);
+            var partial = mc > 0 && mc < totalKeys;
+            var isIgnored = c.mapping && c.mapping.mapping_ignored;
+            var suggestion = getSuggestion(c.id);
+
+            html += '<div class="mapping-card' + (isIgnored ? ' ignored' : '') + '">';
+            var hasSuggestions = !isIgnored && suggestion && Object.keys(suggestion).some(function(s) {
+                var col = targets[s] && targets[s].column;
+                return col && !(c.mapping && c.mapping[col]) && !isDismissed(c.id, s);
+            });
+            html += '<div class="mapping-card-header">';
+            html += '<div><span class="mapping-company-name">' + esc(c.name) + '</span> ';
+            html += '<span class="mapping-company-id">CW #' + c.id + '</span></div>';
+            html += '<div class="mapping-card-actions">';
+            if (hasSuggestions) {
+                html += '<button class="btn-accept-all" data-company-all="' + c.id + '">Accept All</button>';
+                html += '<button class="btn-dismiss-all" data-dismiss-company="' + c.id + '">Dismiss All</button>';
+            }
+            // Ignore/Unignore button
+            if (isIgnored) {
+                html += '<button class="btn-ignore" data-unignore="' + c.id + '">Unignore</button>';
+            } else {
+                html += '<button class="btn-ignore" data-ignore="' + c.id + '">Ignore</button>';
+            }
+            // Status badge
+            var badgeClass = isIgnored ? 'ignored' : (mapped ? 'mapped' : (partial ? 'partial' : 'unmapped'));
+            var badgeText = isIgnored ? 'Ignored' : (mapped ? 'Mapped' : (partial ? mc + '/' + totalKeys : 'Unmapped'));
+            html += '<span class="mapping-badge ' + badgeClass + '">' + badgeText + '</span>';
+            html += '</div>';
+            html += '</div>';
+            html += '<div class="mapping-services">';
+
+            for (var svc in targets) {
+                var t = targets[svc];
+                var currentVal = (c.mapping && c.mapping[t.column]) || '';
+                var sug = suggestion && suggestion[svc];
+
+                html += '<div class="mapping-service">';
+                html += '<div class="mapping-service-top">';
+                var svcMapped = !!(c.mapping && c.mapping[t.column]);
+                html += '<span class="svc-dot ' + (svcMapped ? 'mapped' : 'unmapped') + '"></span>';
+                html += '<span class="mapping-service-label">' + esc(t.label) + '</span>';
+
+                if (t.freetext) {
+                    html += '<input type="text" value="' + esc(currentVal) + '" ' +
+                            'placeholder="Enter ID..." ' +
+                            'data-company="' + c.id + '" data-service="' + esc(svc) + '" ' +
+                            'data-original="' + esc(currentVal) + '">';
+                } else {
+                    html += '<select data-company="' + c.id + '" data-service="' + esc(svc) + '" ' +
+                            'data-original="' + esc(currentVal) + '">';
+                    html += '<option value="">— None —</option>';
+                    (t.items || []).forEach(function(item) {
+                        var selected = item.id === currentVal ? ' selected' : '';
+                        html += '<option value="' + esc(item.id) + '"' + selected + '>' + esc(item.name) + '</option>';
+                    });
+                    html += '</select>';
+                }
+                html += '<button class="btn-save-mapping" data-save-company="' + c.id + '" data-save-service="' + esc(svc) + '">Save</button>';
+                html += '</div>';
+
+                if (sug && !currentVal && !isDismissed(c.id, svc)) {
+                    var sugName = sug.name || sug.id;
+                    html += '<div class="mapping-suggestion">';
+                    html += '<span class="mapping-badge suggested">' + Math.round(sug.score * 100) + '% match</span> ';
+                    html += '<span class="sug-name">' + esc(sugName) + '</span>';
+                    html += '<button class="btn-accept" data-company="' + c.id + '" data-service="' + esc(svc) + '" data-target="' + esc(sug.id).replace(/"/g, '&quot;') + '">Accept</button>';
+                    html += '<button class="btn-reject" data-dismiss="1" data-company="' + c.id + '" data-service="' + esc(svc) + '">Decline</button>';
+                    html += '</div>';
+                }
+
+                html += '</div>';
+            }
+
+            html += '</div></div>';
+        });
+        container.innerHTML = html;
+
+        // Event listeners for accept/decline/accept-all/dismiss-all
+        container.querySelectorAll('.btn-accept[data-target]').forEach(function(btn) {
+            btn.addEventListener('click', function() {
+                acceptSuggestion(btn.getAttribute('data-company'),
+                                 btn.getAttribute('data-service'),
+                                 btn.getAttribute('data-target'));
+            });
+        });
+        container.querySelectorAll('.btn-reject[data-dismiss]').forEach(function(btn) {
+            btn.addEventListener('click', function() {
+                dismissSuggestion(btn.getAttribute('data-company'), btn.getAttribute('data-service'));
+            });
+        });
+        container.querySelectorAll('[data-company-all]').forEach(function(btn) {
+            btn.addEventListener('click', function() {
+                acceptAllForCompany(btn.getAttribute('data-company-all'));
+            });
+        });
+        container.querySelectorAll('[data-dismiss-company]').forEach(function(btn) {
+            btn.addEventListener('click', function() {
+                dismissAllForCompany(btn.getAttribute('data-dismiss-company'));
+            });
+        });
+
+        // Ignore / Unignore handlers
+        container.querySelectorAll('[data-ignore]').forEach(function(btn) {
+            btn.addEventListener('click', function() {
+                toggleIgnore(btn.getAttribute('data-ignore'), true);
+            });
+        });
+        container.querySelectorAll('[data-unignore]').forEach(function(btn) {
+            btn.addEventListener('click', function() {
+                toggleIgnore(btn.getAttribute('data-unignore'), false);
+            });
+        });
+
+        // Show/hide Save button when dropdown or input value changes
+        container.querySelectorAll('select[data-company], input[data-company]').forEach(function(el) {
+            el.addEventListener('change', function() {
+                var saveBtn = el.parentElement.querySelector('.btn-save-mapping');
+                if (saveBtn) saveBtn.style.display = (el.value !== el.dataset.original) ? 'inline-block' : 'none';
+            });
+            el.addEventListener('input', function() {
+                var saveBtn = el.parentElement.querySelector('.btn-save-mapping');
+                if (saveBtn) saveBtn.style.display = (el.value !== el.dataset.original) ? 'inline-block' : 'none';
+            });
+        });
+
+        // Save button click
+        container.querySelectorAll('.btn-save-mapping').forEach(function(btn) {
+            btn.addEventListener('click', function() {
+                if (btn.disabled) return;
+                btn.disabled = true;
+                btn.textContent = 'Saving...';
+                var top = btn.closest('.mapping-service-top');
+                var input = top && top.querySelector('select, input');
+                if (input) {
+                    saveMapping(btn.dataset.saveCompany, btn.dataset.saveService, input.value);
+                } else {
+                    btn.disabled = false;
+                    btn.textContent = 'Save';
+                }
+            });
+        });
+
+        // Show/hide toolbar buttons based on whether any suggestions are visible
+        var visibleSuggestions = container.querySelectorAll('.btn-accept[data-target]');
+        document.getElementById('acceptAllVisible').style.display = visibleSuggestions.length ? '' : 'none';
+        document.getElementById('dismissAllVisible').style.display = visibleSuggestions.length ? '' : 'none';
+
+        // Show auto-map button if any exact matches exist
+        var exactCount = countExactMatches();
+        var autoBtn = document.getElementById('autoMapExact');
+        autoBtn.style.display = exactCount > 0 ? '' : 'none';
+        if (exactCount > 0) autoBtn.textContent = 'Auto-map ' + exactCount + ' Exact Match' + (exactCount === 1 ? '' : 'es');
+    }
+
+    // ── Dismissed suggestions (persisted to sessionStorage) ──
+    var DISMISSED_KEY = 'chatpsa_dismissed_suggestions';
+    var dismissed = (function() {
+        try { return JSON.parse(sessionStorage.getItem(DISMISSED_KEY)) || {}; }
+        catch(e) { return {}; }
+    })();
+    function saveDismissed() {
+        try { sessionStorage.setItem(DISMISSED_KEY, JSON.stringify(dismissed)); }
+        catch(e) { /* quota or private browsing — keep in-memory only */ }
+    }
+    function isDismissed(companyId, service) {
+        return dismissed[companyId + ':' + service] === true;
+    }
+    function dismissSuggestion(companyId, service) {
+        dismissed[companyId + ':' + service] = true;
+        saveDismissed();
+        renderMappings();
+    }
+    function dismissAllForCompany(companyId) {
+        var targets = mappingsData.targets;
+        var suggestion = getSuggestion(companyId);
+        if (!suggestion) return;
+        for (var svc in suggestion) {
+            dismissed[companyId + ':' + svc] = true;
+        }
+        saveDismissed();
+        renderMappings();
+    }
+
+    // ── Single save ──
+    window.saveMapping = function(companyId, service, targetId) {
+        var indicator = document.getElementById('savingIndicator');
+        indicator.classList.add('visible');
+        fetch('/api/admin/mappings', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest'},
+            body: JSON.stringify({company_id: companyId, service: service, target_id: targetId})
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            indicator.classList.remove('visible');
+            if (data.ok) {
+                var co = mappingsData.companies.find(function(c) { return c.id == companyId; });
+                if (co) {
+                    if (!co.mapping) co.mapping = {};
+                    co.mapping[mappingsData.targets[service].column] = targetId || null;
+                }
+                renderMappings();
+            } else {
+                alert('Failed: ' + (data.error || 'unknown'));
+            }
+        })
+        .catch(function() { indicator.classList.remove('visible'); alert('Network error'); });
+    };
+    window.acceptSuggestion = function(companyId, service, targetId) {
+        saveMapping(companyId, service, targetId);
+    };
+
+    // ── Bulk accept helpers ──
+    function collectVisibleSuggestions(scope) {
+        // scope: 'all' or a company ID string
+        var container = document.getElementById('mappingsContainer');
+        var buttons = container.querySelectorAll('.btn-accept[data-target]');
+        var items = [];
+        buttons.forEach(function(btn) {
+            var cid = btn.getAttribute('data-company');
+            if (scope !== 'all' && cid !== String(scope)) return;
+            items.push({
+                company_id: cid,
+                service: btn.getAttribute('data-service'),
+                target_id: btn.getAttribute('data-target')
+            });
+        });
+        return items;
+    }
+
+    function bulkAccept(items, label) {
+        if (!items.length) return;
+        var indicator = document.getElementById('savingIndicator');
+        indicator.classList.add('visible');
+        fetch('/api/admin/mappings/bulk', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest'},
+            body: JSON.stringify({mappings: items})
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            indicator.classList.remove('visible');
+            if (data.ok) {
+                // Update local state
+                items.forEach(function(item) {
+                    var co = mappingsData.companies.find(function(c) { return c.id == item.company_id; });
+                    if (co) {
+                        if (!co.mapping) co.mapping = {};
+                        co.mapping[mappingsData.targets[item.service].column] = item.target_id || null;
+                    }
+                });
+                renderMappings();
+            } else {
+                alert('Bulk save failed: ' + (data.error || 'unknown'));
+            }
+        })
+        .catch(function() { indicator.classList.remove('visible'); alert('Network error'); });
+    }
+
+    function acceptAllForCompany(companyId) {
+        bulkAccept(collectVisibleSuggestions(companyId), 'company');
+    }
+
+    window.acceptAllVisible = function() {
+        var items = collectVisibleSuggestions('all');
+        if (!items.length) return;
+        if (!confirm('Accept ' + items.length + ' suggestion(s)?')) return;
+        bulkAccept(items, 'all');
+    };
+
+    window.dismissAllVisible = function() {
+        var container = document.getElementById('mappingsContainer');
+        container.querySelectorAll('.btn-reject[data-dismiss]').forEach(function(btn) {
+            var cid = btn.getAttribute('data-company');
+            var svc = btn.getAttribute('data-service');
+            dismissed[cid + ':' + svc] = true;
+        });
+        saveDismissed();
+        renderMappings();
+    };
+
+    function countExactMatches() {
+        if (!suggestionsData || !suggestionsData.suggestions || !mappingsData) return 0;
+        var targets = mappingsData.targets || {};
+        var count = 0;
+        suggestionsData.suggestions.forEach(function(s) {
+            var co = mappingsData.companies.find(function(c) { return c.id == s.company_id; });
+            if (co && co.mapping && co.mapping.mapping_ignored) return;
+            for (var svc in s.matches) {
+                var col = targets[svc] && targets[svc].column;
+                if (col && !(co && co.mapping && co.mapping[col]) && !isDismissed(s.company_id, svc)) {
+                    if (s.matches[svc].score >= 1.0) count++;
+                }
+            }
+        });
+        return count;
+    }
+
+    window.autoMapExactMatches = function() {
+        if (!suggestionsData || !suggestionsData.suggestions || !mappingsData) return;
+        var targets = mappingsData.targets || {};
+        var items = [];
+        suggestionsData.suggestions.forEach(function(s) {
+            var co = mappingsData.companies.find(function(c) { return c.id == s.company_id; });
+            if (co && co.mapping && co.mapping.mapping_ignored) return;
+            for (var svc in s.matches) {
+                var col = targets[svc] && targets[svc].column;
+                if (col && !(co && co.mapping && co.mapping[col]) && !isDismissed(s.company_id, svc)) {
+                    if (s.matches[svc].score >= 1.0) {
+                        items.push({company_id: s.company_id, service: svc, target_id: s.matches[svc].id});
+                    }
+                }
+            }
+        });
+        if (!items.length) return;
+        if (!confirm('Auto-map ' + items.length + ' exact match' + (items.length === 1 ? '' : 'es') + '?')) return;
+        bulkAccept(items, 'exact');
+    };
+
+    function toggleIgnore(companyId, ignored) {
+        var indicator = document.getElementById('savingIndicator');
+        indicator.classList.add('visible');
+        fetch('/api/admin/mappings/ignore', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest'},
+            body: JSON.stringify({company_id: companyId, ignored: ignored})
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            indicator.classList.remove('visible');
+            if (data.ok) {
+                var co = mappingsData.companies.find(function(c) { return c.id == companyId; });
+                if (co) {
+                    if (!co.mapping) co.mapping = {};
+                    co.mapping.mapping_ignored = ignored ? 1 : 0;
+                }
+                renderMappings();
+            } else {
+                alert('Failed: ' + (data.error || 'unknown'));
+            }
+        })
+        .catch(function() { indicator.classList.remove('visible'); alert('Network error'); });
+    }
+})();
+</script>
+
+</body>
+</html>

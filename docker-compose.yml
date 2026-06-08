@@ -1,0 +1,466 @@
+services:
+  chatpsa:
+    build: .
+    container_name: psa-app
+    restart: unless-stopped
+    # A reverse proxy on the host forwards your domain → 5001.
+    ports:
+      - "127.0.0.1:${APP_PORT:-5001}:5001"
+    env_file:
+      - .env
+    volumes:
+      - cw-data:/data
+      - ./static:/app/static:ro
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5001/healthz')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  # Background sync — writes to the shared data volume.
+  # To save API quota during development you can comment out this service entirely
+  # and instead run a one-off sync with:
+  #   docker compose exec chatpsa python sync_cw_data.py --db /data/cw_data.db
+  cw-sync:
+    build: .
+    container_name: psa-sync
+    restart: unless-stopped
+    environment:
+      - PYTHONUNBUFFERED=1
+      - TZ=${APP_TZ_NAME:-UTC}
+    env_file:
+      - .env
+    volumes:
+      - cw-data:/data
+    healthcheck:
+      disable: true
+    entrypoint: ["sh", "-c"]
+    command:
+      - |
+        rm -f /data/.sync_running_cw
+        LAST_AGE=$$(python3 -c "
+        import sqlite3, time
+        try:
+          c = sqlite3.connect('/data/cw_data.db')
+          r = c.execute('SELECT synced_at FROM sync_log WHERE tables_synced LIKE ? ORDER BY id DESC LIMIT 1', ('%tickets%',)).fetchone()
+          if r and r[0]:
+            from datetime import datetime, timezone
+            dt = datetime.fromisoformat(r[0].replace('Z','+00:00'))
+            print(int(time.time() - dt.timestamp()))
+          else: print(-1)
+        except: print(-1)
+        " 2>/dev/null)
+        if [ "$$LAST_AGE" -ge 0 ] && [ "$$LAST_AGE" -lt 3600 ]; then
+          echo "CW synced $${LAST_AGE}s ago (< 1 hr) — skipping initial sync."
+        else
+          if [ "$$LAST_AGE" -lt 0 ]; then
+            echo "Fresh DB — waiting 5 min before initial sync..."
+            sleep 300
+          fi
+          echo "Running initial sync..."
+          if python sync_cw_data.py --db /data/cw_data.db; then
+            echo "Initial sync done."
+          else
+            echo "ERROR: Initial sync failed (exit code $$?)."
+          fi
+        fi
+        echo "Periodic sync every 60 min (Mon-Fri 6am-7pm local time)."
+        while true; do
+          sleep 3600
+          HOUR=$(python3 -c "from config import APP_TZ; from datetime import datetime; print(datetime.now(APP_TZ).hour)")
+          DOW=$(python3 -c "from config import APP_TZ; from datetime import datetime; print(datetime.now(APP_TZ).isoweekday())")
+          if [ "$$DOW" -le 5 ] && [ "$$HOUR" -ge 6 ] && [ "$$HOUR" -lt 19 ]; then
+            # Wait for other syncs to finish before starting
+            while [ -f /data/.sync_running_cipp ] || [ -f /data/.sync_running_duo ] || [ -f /data/.sync_running_threatlocker ] || [ -f /data/.sync_running_huntress ]; do
+              echo "$(date) — Another sync in progress, waiting 30s..."
+              sleep 30
+            done
+            touch /data/.sync_running_cw
+            echo "$(date) — Running periodic sync (production)..."
+            if python sync_cw_data.py --db /data/cw_data.db --recent --days 7; then
+              echo "$(date) — Sync complete."
+            else
+              echo "$(date) — ERROR: CW sync failed (exit code $$?)." >&2
+            fi
+            rm -f /data/.sync_running_cw
+          else
+            echo "$(date) — Outside business hours, skipping sync."
+          fi
+        done
+
+  # CIPP / Microsoft 365 sync — writes into the same DB volume so Claude can
+  # join CIPP and CW data.  Runs every 4 hours during business hours.
+  # Requires CIPP_* credentials (Admin → Settings or .env).
+  # If not configured the container waits until credentials are added.
+  cipp-sync:
+    build: .
+    container_name: psa-cipp-sync
+    restart: unless-stopped
+    environment:
+      - PYTHONUNBUFFERED=1
+      - TZ=${APP_TZ_NAME:-UTC}
+    env_file:
+      - .env
+    volumes:
+      - cw-data:/data
+    healthcheck:
+      disable: true
+    entrypoint: ["sh", "-c"]
+    command:
+      - |
+        SIGNAL="/data/.restart_cipp_sync"
+        POLICY_FLAG=""
+        if [ "$${CIPP_SYNC_POLICIES:-false}" = "true" ]; then
+          POLICY_FLAG="--policies"
+        fi
+        rm -f /data/.sync_running_cipp "$$SIGNAL"
+
+        # Run sync; if exit code 10 (not configured), wait for signal file
+        run_or_wait() {
+          while true; do
+            "$@"; RC=$$?
+            if [ "$$RC" -ne 10 ]; then return $$RC; fi
+            echo "Not configured — waiting for credentials (Admin → Settings or .env)."
+            while [ ! -f "$$SIGNAL" ]; do sleep 30; done
+            rm -f "$$SIGNAL"
+            echo "$$(date) — Credentials updated, retrying..."
+          done
+        }
+
+        LAST_AGE=$$(python3 -c "
+        import sqlite3, time
+        try:
+          c = sqlite3.connect('/data/cw_data.db')
+          r = c.execute('SELECT synced_at FROM sync_log WHERE tables_synced LIKE ? ORDER BY id DESC LIMIT 1', ('%cipp_tenants%',)).fetchone()
+          if r and r[0]:
+            from datetime import datetime, timezone
+            dt = datetime.fromisoformat(r[0].replace('Z','+00:00'))
+            print(int(time.time() - dt.timestamp()))
+          else: print(-1)
+        except: print(-1)
+        " 2>/dev/null)
+        if [ "$$LAST_AGE" -ge 0 ] && [ "$$LAST_AGE" -lt 14400 ]; then
+          echo "CIPP synced $${LAST_AGE}s ago (< 4 hr) — skipping initial sync."
+        else
+          if [ "$$LAST_AGE" -lt 0 ]; then
+            echo "Fresh DB — waiting 10 min before initial CIPP sync..."
+            sleep 600
+          fi
+          echo "Running initial CIPP sync..."
+          run_or_wait python sync_cipp_data.py --db /data/cw_data.db $$POLICY_FLAG
+          if [ $$? -eq 0 ]; then echo "Initial CIPP sync done."; else echo "ERROR: Initial CIPP sync failed."; fi
+        fi
+        echo "Periodic CIPP sync every 4 hours (Mon-Fri 6am-7pm local time)."
+        while true; do
+          # Offset by 30 min from CW sync cycle to avoid collisions
+          sleep 14430
+          HOUR=$(python3 -c "from config import APP_TZ; from datetime import datetime; print(datetime.now(APP_TZ).hour)")
+          DOW=$(python3 -c "from config import APP_TZ; from datetime import datetime; print(datetime.now(APP_TZ).isoweekday())")
+          if [ "$$DOW" -le 5 ] && [ "$$HOUR" -ge 6 ] && [ "$$HOUR" -lt 19 ]; then
+            # Wait for CW sync to finish before starting
+            while [ -f /data/.sync_running_cw ]; do
+              echo "$(date) — CW sync in progress, waiting 30s..."
+              sleep 30
+            done
+            touch /data/.sync_running_cipp
+            echo "$(date) — Running periodic CIPP sync..."
+            run_or_wait python sync_cipp_data.py --db /data/cw_data.db $$POLICY_FLAG
+            if [ $$? -eq 0 ]; then
+              echo "$(date) — CIPP sync complete."
+            else
+              echo "$(date) — ERROR: CIPP sync failed." >&2
+            fi
+            rm -f /data/.sync_running_cipp
+          else
+            echo "$(date) — Outside business hours, skipping CIPP sync."
+          fi
+        done
+
+  # Duo Security user sync — pulls MFA enrollment and user status from the
+  # Duo Admin API.  Runs every 6 hours (user data changes infrequently).
+  # Requires DUO_IKEY, DUO_SKEY, DUO_HOST (Admin → Settings or .env).
+  # If not configured the container waits until credentials are added.
+  duo-sync:
+    build: .
+    container_name: psa-duo-sync
+    restart: unless-stopped
+    environment:
+      - PYTHONUNBUFFERED=1
+    env_file:
+      - .env
+    volumes:
+      - cw-data:/data
+    healthcheck:
+      disable: true
+    entrypoint: ["sh", "-c"]
+    command:
+      - |
+        SIGNAL="/data/.restart_duo_sync"
+        rm -f /data/.sync_running_duo "$$SIGNAL"
+
+        run_or_wait() {
+          while true; do
+            "$@"; RC=$$?
+            if [ "$$RC" -ne 10 ]; then return $$RC; fi
+            echo "Not configured — waiting for credentials (Admin → Settings or .env)."
+            while [ ! -f "$$SIGNAL" ]; do sleep 30; done
+            rm -f "$$SIGNAL"
+            echo "$$(date) — Credentials updated, retrying..."
+          done
+        }
+
+        LAST_AGE=$$(python3 -c "
+        import sqlite3, time
+        try:
+          c = sqlite3.connect('/data/cw_data.db')
+          r = c.execute('SELECT synced_at FROM sync_log WHERE tables_synced LIKE ? ORDER BY id DESC LIMIT 1', ('%duo_users%',)).fetchone()
+          if r and r[0]:
+            from datetime import datetime, timezone
+            dt = datetime.fromisoformat(r[0].replace('Z','+00:00'))
+            print(int(time.time() - dt.timestamp()))
+          else: print(-1)
+        except: print(-1)
+        " 2>/dev/null)
+        if [ "$$LAST_AGE" -ge 0 ] && [ "$$LAST_AGE" -lt 21600 ]; then
+          echo "Duo synced $${LAST_AGE}s ago (< 6 hr) — skipping initial sync."
+        else
+          if [ "$$LAST_AGE" -lt 0 ]; then
+            echo "Fresh DB — waiting 20 min before initial Duo sync..."
+            sleep 1200
+          fi
+          echo "Running initial Duo sync..."
+          run_or_wait python sync_duo_data.py --db /data/cw_data.db
+          if [ $$? -eq 0 ]; then echo "Initial Duo sync done."; else echo "ERROR: Initial Duo sync failed."; fi
+        fi
+        echo "Refreshing every 6 hours."
+        while true; do
+          sleep 21600
+          # Wait for heavy syncs to finish
+          while [ -f /data/.sync_running_cw ] || [ -f /data/.sync_running_cipp ]; do
+            echo "$(date) — Another sync in progress, waiting 30s..."
+            sleep 30
+          done
+          touch /data/.sync_running_duo
+          echo "$(date) — Refreshing Duo user data..."
+          run_or_wait python sync_duo_data.py --db /data/cw_data.db
+          if [ $$? -eq 0 ]; then
+            echo "$(date) — Duo sync complete."
+          else
+            echo "$(date) — ERROR: Duo sync failed." >&2
+          fi
+          rm -f /data/.sync_running_duo
+        done
+
+  # ThreatLocker endpoint inventory sync — pulls computer records from the
+  # ThreatLocker portal API.  Runs every 6 hours.
+  # Requires THREATLOCKER_API_KEY (Admin → Settings or .env).
+  # If not configured the container waits until credentials are added.
+  threatlocker-sync:
+    build: .
+    container_name: psa-threatlocker-sync
+    restart: unless-stopped
+    environment:
+      - PYTHONUNBUFFERED=1
+    env_file:
+      - .env
+    volumes:
+      - cw-data:/data
+    healthcheck:
+      disable: true
+    entrypoint: ["sh", "-c"]
+    command:
+      - |
+        SIGNAL="/data/.restart_threatlocker_sync"
+        rm -f /data/.sync_running_threatlocker "$$SIGNAL"
+
+        run_or_wait() {
+          while true; do
+            "$@"; RC=$$?
+            if [ "$$RC" -ne 10 ]; then return $$RC; fi
+            echo "Not configured — waiting for credentials (Admin → Settings or .env)."
+            while [ ! -f "$$SIGNAL" ]; do sleep 30; done
+            rm -f "$$SIGNAL"
+            echo "$$(date) — Credentials updated, retrying..."
+          done
+        }
+
+        LAST_AGE=$$(python3 -c "
+        import sqlite3, time
+        try:
+          c = sqlite3.connect('/data/cw_data.db')
+          r = c.execute('SELECT synced_at FROM sync_log WHERE tables_synced LIKE ? ORDER BY id DESC LIMIT 1', ('%threatlocker_%',)).fetchone()
+          if r and r[0]:
+            from datetime import datetime, timezone
+            dt = datetime.fromisoformat(r[0].replace('Z','+00:00'))
+            print(int(time.time() - dt.timestamp()))
+          else: print(-1)
+        except: print(-1)
+        " 2>/dev/null)
+        if [ "$$LAST_AGE" -ge 0 ] && [ "$$LAST_AGE" -lt 21600 ]; then
+          echo "ThreatLocker synced $${LAST_AGE}s ago (< 6 hr) — skipping initial sync."
+        else
+          if [ "$$LAST_AGE" -lt 0 ]; then
+            echo "Fresh DB — waiting 25 min before initial ThreatLocker sync..."
+            sleep 1500
+          fi
+          echo "Running initial ThreatLocker sync..."
+          run_or_wait python sync_threatlocker_data.py --db /data/cw_data.db
+          if [ $$? -eq 0 ]; then echo "Initial ThreatLocker sync done."; else echo "ERROR: Initial ThreatLocker sync failed."; fi
+        fi
+        echo "Refreshing every 6 hours."
+        while true; do
+          sleep 21600
+          # Wait for heavy syncs to finish
+          while [ -f /data/.sync_running_cw ] || [ -f /data/.sync_running_cipp ]; do
+            echo "$(date) — Another sync in progress, waiting 30s..."
+            sleep 30
+          done
+          touch /data/.sync_running_threatlocker
+          echo "$(date) — Refreshing ThreatLocker endpoint data..."
+          run_or_wait python sync_threatlocker_data.py --db /data/cw_data.db
+          if [ $$? -eq 0 ]; then
+            echo "$(date) — ThreatLocker sync complete."
+          else
+            echo "$(date) — ERROR: ThreatLocker sync failed." >&2
+          fi
+          rm -f /data/.sync_running_threatlocker
+        done
+
+  # Huntress EDR sync — pulls organisation, agent, and incident data from the
+  # Huntress API.  Runs every 6 hours.
+  # Requires HUNTRESS_API_KEY, HUNTRESS_API_SECRET (Admin → Settings or .env).
+  # If not configured the container waits until credentials are added.
+  huntress-sync:
+    build: .
+    container_name: psa-huntress-sync
+    restart: unless-stopped
+    environment:
+      - PYTHONUNBUFFERED=1
+    env_file:
+      - .env
+    volumes:
+      - cw-data:/data
+    healthcheck:
+      disable: true
+    entrypoint: ["sh", "-c"]
+    command:
+      - |
+        SIGNAL="/data/.restart_huntress_sync"
+        rm -f /data/.sync_running_huntress "$$SIGNAL"
+
+        run_or_wait() {
+          while true; do
+            "$@"; RC=$$?
+            if [ "$$RC" -ne 10 ]; then return $$RC; fi
+            echo "Not configured — waiting for credentials (Admin → Settings or .env)."
+            while [ ! -f "$$SIGNAL" ]; do sleep 30; done
+            rm -f "$$SIGNAL"
+            echo "$$(date) — Credentials updated, retrying..."
+          done
+        }
+
+        LAST_AGE=$$(python3 -c "
+        import sqlite3, time
+        try:
+          c = sqlite3.connect('/data/cw_data.db')
+          r = c.execute('SELECT synced_at FROM sync_log WHERE tables_synced LIKE ? ORDER BY id DESC LIMIT 1', ('%huntress_%',)).fetchone()
+          if r and r[0]:
+            from datetime import datetime, timezone
+            dt = datetime.fromisoformat(r[0].replace('Z','+00:00'))
+            print(int(time.time() - dt.timestamp()))
+          else: print(-1)
+        except: print(-1)
+        " 2>/dev/null)
+        if [ "$$LAST_AGE" -ge 0 ] && [ "$$LAST_AGE" -lt 21600 ]; then
+          echo "Huntress synced $${LAST_AGE}s ago (< 6 hr) — skipping initial sync."
+        else
+          if [ "$$LAST_AGE" -lt 0 ]; then
+            echo "Fresh DB — waiting 30 min before initial Huntress sync..."
+            sleep 1800
+          fi
+          echo "Running initial Huntress sync..."
+          run_or_wait python sync_huntress_data.py --db /data/cw_data.db
+          if [ $$? -eq 0 ]; then echo "Initial Huntress sync done."; else echo "ERROR: Initial Huntress sync failed."; fi
+        fi
+        echo "Refreshing every 6 hours."
+        while true; do
+          sleep 21600
+          # Wait for heavy syncs to finish
+          while [ -f /data/.sync_running_cw ] || [ -f /data/.sync_running_cipp ]; do
+            echo "$(date) — Another sync in progress, waiting 30s..."
+            sleep 30
+          done
+          touch /data/.sync_running_huntress
+          echo "$(date) — Refreshing Huntress EDR data..."
+          run_or_wait python sync_huntress_data.py --db /data/cw_data.db
+          if [ $$? -eq 0 ]; then
+            echo "$(date) — Huntress sync complete."
+          else
+            echo "$(date) — ERROR: Huntress sync failed." >&2
+          fi
+          rm -f /data/.sync_running_huntress
+        done
+
+  # Timeline parser — extracts future dates from ticket notes and stores
+  # them as timeline events.  Runs every 2 hours, offset 30 min from the
+  # CW sync so freshly-synced notes are available.
+  timeline-parse:
+    build: .
+    container_name: psa-timeline-parse
+    restart: unless-stopped
+    environment:
+      - PYTHONUNBUFFERED=1
+      - TZ=${APP_TZ_NAME:-UTC}
+    env_file:
+      - .env
+    volumes:
+      - cw-data:/data
+    healthcheck:
+      disable: true
+    entrypoint: ["sh", "-c"]
+    command:
+      - |
+        LAST_AGE=$$(python3 -c "
+        import sqlite3, time
+        try:
+          c = sqlite3.connect('/data/cw_data.db')
+          r = c.execute('SELECT MAX(created_at) FROM timeline_events').fetchone()
+          if r and r[0]:
+            from datetime import datetime, timezone
+            dt = datetime.fromisoformat(r[0].replace('Z','+00:00'))
+            print(int(time.time() - dt.timestamp()))
+          else: print(-1)
+        except: print(-1)
+        " 2>/dev/null)
+        if [ "$$LAST_AGE" -ge 0 ] && [ "$$LAST_AGE" -lt 7200 ]; then
+          echo "Timeline parsed $${LAST_AGE}s ago (< 2 hr) — skipping initial parse."
+        else
+          if [ "$$LAST_AGE" -lt 0 ]; then
+            echo "Fresh DB — waiting 45 min for CW sync to complete..."
+            sleep 2700
+          fi
+          echo "Running initial timeline parse..."
+          if python parse_timeline.py --db /data/cw_data.db; then
+            echo "Initial parse done."
+          else
+            echo "ERROR: Initial timeline parse failed (exit code $$?)."
+          fi
+        fi
+        echo "Re-parsing every 2 hours."
+        while true; do
+          sleep 7200
+          # Wait for CW sync to finish (we need fresh notes)
+          while [ -f /data/.sync_running_cw ] || [ -f /data/.sync_running_cipp ]; do
+            echo "$(date) — Sync in progress, waiting 30s..."
+            sleep 30
+          done
+          echo "$(date) — Running timeline parse (production)..."
+          if python parse_timeline.py --db /data/cw_data.db; then
+            echo "$(date) — Timeline parse complete."
+          else
+            echo "$(date) — ERROR: Timeline parse failed (exit code $$?)." >&2
+          fi
+        done
+
+volumes:
+  cw-data:

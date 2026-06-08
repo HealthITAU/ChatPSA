@@ -1,0 +1,30 @@
+[
+  {
+    "version": "1.1",
+    "date": "June 2026",
+    "changes": [
+      "<strong>Huntress EDR integration</strong> — sync endpoint agents, organisations, and incident data. Open incidents surface automatically as anomalies on the Trends page.",
+      "<strong>ThreatLocker anomaly detection</strong> — two new anomalies: endpoints not in Secure mode and organisations with unusual deny-count spikes.",
+      "<strong>DST-aware timezone support</strong> — configure your timezone with an IANA name (e.g. <code>Australia/Sydney</code>, <code>America/New_York</code>) and ChatPSA automatically adjusts for daylight saving transitions.",
+      "<strong>Graceful sync containers</strong> — all optional sync containers (CIPP, Duo, ThreatLocker, Huntress) now start by default and wait for credentials. Configure via Admin → Settings and they begin syncing within 30 seconds — no restart needed.",
+      "<strong>Admin UI improvements</strong> — Test Connection buttons for all integrations, Sync Status tab with row counts, and a link to the full Analytics dashboard.",
+      "<strong>Documentation overhaul</strong> — step-by-step setup guides for all five integrations, administration guide, timezone configuration, reverse proxy examples, and troubleshooting."
+    ]
+  },
+  {
+    "version": "1.0",
+    "date": "May 2026",
+    "changes": [
+      "<strong>Initial open-source release</strong> — ChatPSA is now publicly available. Natural-language queries over your ConnectWise Manage data, powered by Claude.",
+      "<strong>Multi-source data syncing</strong> — pulls data from ConnectWise Manage, CIPP/Microsoft 365, and Duo Security into a local SQLite database.",
+      "<strong>Trend and anomaly detection</strong> — surfaces ticket spikes, quiet clients, overdue tickets, unused M365 licences, and stale priority tickets automatically on the Trends page.",
+      "<strong>Timeline view</strong> — extracts future-dated events from ticket notes so you can see what's coming up across all clients.",
+      "<strong>Agent memory</strong> — ask the agent to remember anything and it persists across sessions, with per-user context so each team member has their own preferences.",
+      "<strong>Query learning</strong> — thumbs-up a response and the question and SQL are saved as a reference example. The agent's accuracy improves over time as your team uses it.",
+      "<strong>Pinned queries</strong> — save live SQL queries that re-run on every Trends page load, giving you an at-a-glance dashboard of metrics you care about.",
+      "<strong>Microsoft Entra ID authentication</strong> — sign in with your Microsoft 365 account via Azure AD. First user to sign in is automatically granted admin access.",
+      "<strong>Usage analytics dashboard</strong> — track 7-day activity, response times, error rates, peak usage hours, and AI-powered query theme clustering.",
+      "<strong>Configurable app name</strong> — set <code>APP_NAME</code> in your <code>.env</code> to customise the branding throughout the UI."
+    ]
+  }
+]

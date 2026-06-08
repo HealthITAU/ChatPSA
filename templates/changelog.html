@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Changelog — {{ app_name }}</title>
+    <link rel="icon" type="image/x-icon" href="/static/favicon.ico">
+    <link rel="icon" type="image/png" sizes="32x32" href="/static/favicon-32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="/static/favicon-16.png">
+    <link rel="apple-touch-icon" sizes="180x180" href="/static/apple-touch-icon.png">
+    <style>
+        :root, [data-theme="dark"] {
+            --bg: #0f1117;
+            --surface: #1a1d27;
+            --surface-hover: #242736;
+            --border: #2e3142;
+            --text: #e1e4ed;
+            --text-muted: #8b8fa3;
+            --accent: #6c63ff;
+            --accent-hover: #5a52d5;
+            --success: #34d399;
+            --code-bg: #151822;
+        }
+        [data-theme="light"] {
+            --bg: #f5f6f8;
+            --surface: #ffffff;
+            --surface-hover: #f0f1f4;
+            --border: #dcdee4;
+            --text: #1a1d27;
+            --text-muted: #6b7084;
+            --accent: #5b52e0;
+            --success: #16a369;
+            --warning: #d97706;
+            --error: #dc2626;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+        }
+
+        .btn {
+            padding: 6px 14px;
+            border-radius: 6px;
+            border: 1px solid var(--border);
+            background: var(--surface);
+            color: var(--text-muted);
+            font-size: 13px;
+            cursor: pointer;
+            transition: all 0.15s;
+            text-decoration: none;
+            display: inline-block;
+        }
+
+        .btn:hover {
+            background: var(--surface-hover);
+            color: var(--text);
+        }
+
+        /* Page content */
+        .page {
+            max-width: 720px;
+            margin: 48px auto;
+            padding: 0 24px 80px;
+        }
+
+        .page-header {
+            margin-bottom: 40px;
+        }
+
+        .page-header h2 {
+            font-size: 24px;
+            font-weight: 700;
+            margin-bottom: 8px;
+        }
+
+        .page-header p {
+            color: var(--text-muted);
+            font-size: 14px;
+            line-height: 1.6;
+        }
+
+        /* Version blocks */
+        .version-block {
+            display: flex;
+            gap: 32px;
+            margin-bottom: 40px;
+        }
+
+        .version-aside {
+            flex-shrink: 0;
+            width: 100px;
+            padding-top: 2px;
+            text-align: right;
+        }
+
+        .version-badge {
+            display: inline-block;
+            font-size: 12px;
+            font-weight: 700;
+            color: var(--accent);
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+        }
+
+        .version-date {
+            display: block;
+            font-size: 11px;
+            color: var(--text-muted);
+            margin-top: 3px;
+        }
+
+        .version-connector {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            flex-shrink: 0;
+            width: 20px;
+        }
+
+        .version-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: var(--accent);
+            flex-shrink: 0;
+            margin-top: 4px;
+        }
+
+        .version-line {
+            width: 2px;
+            flex: 1;
+            background: var(--border);
+            margin-top: 6px;
+        }
+
+        .version-block:last-child .version-line {
+            display: none;
+        }
+
+        .version-body {
+            flex: 1;
+            padding-bottom: 8px;
+        }
+
+        .version-body ul {
+            list-style: none;
+            padding: 0;
+        }
+
+        .version-body ul li {
+            font-size: 14px;
+            color: var(--text-muted);
+            line-height: 1.7;
+            padding: 4px 0 4px 16px;
+            position: relative;
+        }
+
+        .version-body ul li::before {
+            content: '–';
+            position: absolute;
+            left: 0;
+            color: var(--border);
+        }
+
+        .version-body ul li strong {
+            color: var(--text);
+            font-weight: 500;
+        }
+
+        /* Divider */
+        hr {
+            border: none;
+            border-top: 1px solid var(--border);
+            margin: 0 0 40px;
+        }
+
+        @media (max-width: 600px) {
+            .version-aside { display: none; }
+            .version-connector { display: none; }
+        }
+
+    </style>
+    <script>
+        (function(){
+            var t = null; try { t = localStorage.getItem('timeline-theme'); } catch(e) {}
+            if (t) document.documentElement.setAttribute('data-theme', t);
+        })();
+    </script>
+</head>
+<body>
+
+{% include '_nav.html' %}
+
+<div class="page">
+    <div class="page-header">
+        <h2>What's new</h2>
+        <p>A full history of user-facing improvements to {{ app_name }}.</p>
+    </div>
+
+    {% for entry in entries %}
+    <div class="version-block">
+        <div class="version-aside">
+            <span class="version-badge">v{{ entry.version }}</span>
+            <span class="version-date">{{ entry.date }}</span>
+        </div>
+        <div class="version-connector">
+            <div class="version-dot"></div>
+            <div class="version-line"></div>
+        </div>
+        <div class="version-body">
+            <ul>
+                {% for change in entry.changes %}
+                <li>{{ change | safe }}</li>
+                {% endfor %}
+            </ul>
+        </div>
+    </div>
+    {% endfor %}
+
+</div>
+
+</body>
+</html>

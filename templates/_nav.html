@@ -1,0 +1,968 @@
+{# ── Shared navigation bar partial ──────────────────────────────────────────
+   Include this in every page template AFTER the opening <body> tag.
+   Requires template vars: auth_enabled, user_name, has_timeline, has_admin, app_version
+   Provides: Data sources popup, Recent changes popup, nav links, theme toggle, user/logout
+#}
+
+{# ── Nav CSS ───────────────────────────────────────────────────────────────── #}
+<style>
+    /* ── Nav header ──────────────────────────────────────────────────────── */
+    .nav-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 12px 20px;
+        background: var(--surface);
+        border-bottom: 1px solid var(--border);
+        flex-shrink: 0;
+    }
+    .nav-header-left {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+    }
+    .nav-logo { height: 28px; width: 28px; object-fit: contain; }
+    .nav-header h1 { font-size: 16px; font-weight: 600; margin: 0; }
+    .nav-header .version {
+        font-size: 11px;
+        font-weight: 400;
+        color: var(--text-muted);
+        margin-left: 6px;
+    }
+    .nav-header-actions {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+    .nav-separator {
+        width: 1px;
+        height: 20px;
+        background: var(--border);
+        margin: 0 4px;
+    }
+    .nav-user-name {
+        font-size: 12px;
+        color: var(--text-muted);
+    }
+
+    /* ── Nav shared button ───────────────────────────────────────────────── */
+    .nav-btn {
+        padding: 6px 14px;
+        border-radius: 6px;
+        border: 1px solid var(--border);
+        background: var(--surface);
+        color: var(--text-muted);
+        font-size: 13px;
+        font-family: inherit;
+        cursor: pointer;
+        text-decoration: none;
+        transition: all 0.15s;
+    }
+    .nav-btn:hover { background: var(--surface-hover); color: var(--text); border-color: var(--accent); }
+    .nav-btn:focus-visible {
+        outline: none;
+        box-shadow: 0 0 0 2px var(--accent);
+    }
+
+    /* ── Icon button (sources, changelog) ────────────────────────────────── */
+    .nav-icon-btn {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 32px;
+        height: 32px;
+        border-radius: 6px;
+        border: 1px solid var(--border);
+        background: var(--surface);
+        color: var(--text-muted);
+        cursor: pointer;
+        transition: all 0.15s;
+        padding: 0;
+        position: relative;
+    }
+    .nav-icon-btn:hover,
+    .nav-icon-btn[aria-expanded="true"] {
+        background: var(--surface-hover);
+        color: var(--text);
+        border-color: var(--accent);
+    }
+    .nav-icon-btn:focus-visible {
+        outline: none;
+        box-shadow: 0 0 0 2px var(--accent);
+    }
+    .nav-icon-btn svg { width: 15px; height: 15px; flex-shrink: 0; }
+
+    /* Status badge on sources button */
+    .nav-status-badge {
+        position: absolute;
+        top: 4px;
+        right: 4px;
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        border: 1.5px solid var(--surface);
+    }
+    .nav-status-badge[hidden] { display: none; }
+    .nav-status-badge.ok { background: var(--success); }
+    .nav-status-badge.error { background: var(--error); }
+
+    /* Pulsing badge on sources button while syncing */
+    .nav-sync-badge {
+        position: absolute;
+        top: 4px;
+        right: 4px;
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        background: var(--accent);
+        border: 1.5px solid var(--surface);
+        animation: navPulse 1.2s ease-in-out infinite;
+    }
+    .nav-sync-badge[hidden] { display: none; }
+    @keyframes navPulse {
+        0%, 100% { opacity: 1; }
+        50%      { opacity: 0.3; }
+    }
+
+    /* ── Panel popup (shared) ────────────────────────────────────────────── */
+    .nav-panel-wrapper { position: relative; }
+
+    .nav-panel-popup {
+        display: none;
+        position: absolute;
+        top: calc(100% + 8px);
+        right: 0;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        z-index: 200;
+        box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+        animation: navFadeIn 0.15s ease;
+    }
+    .nav-panel-popup.visible { display: block; }
+
+    @keyframes navFadeIn {
+        from { opacity: 0; transform: translateY(-4px); }
+        to   { opacity: 1; transform: translateY(0); }
+    }
+
+    .nav-panel-popup-header {
+        font-size: 13px;
+        font-weight: 600;
+        color: var(--text);
+        padding: 12px 16px 10px;
+        border-bottom: 1px solid var(--border);
+    }
+
+    /* ── Data sources panel ──────────────────────────────────────────────── */
+    #navSourcesPopup { width: 360px; }
+
+    .nav-source-row { padding: 10px 16px 12px; }
+    .nav-source-row + .nav-source-row { border-top: 1px solid var(--border); }
+
+    .nav-source-header {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-bottom: 6px;
+    }
+
+    .nav-source-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        flex-shrink: 0;
+    }
+    .nav-source-dot.ok      { background: var(--success); }
+    .nav-source-dot.warn    { background: var(--warning); }
+    .nav-source-dot.error   { background: var(--error); }
+    .nav-source-dot.syncing {
+        background: var(--accent);
+        animation: navPulse 1.2s ease-in-out infinite;
+    }
+
+    .nav-source-label {
+        font-size: 13px;
+        font-weight: 500;
+        color: var(--text);
+        flex: 1;
+    }
+
+    .nav-source-meta {
+        font-size: 11px;
+        color: var(--text-muted);
+        padding-left: 18px;
+        line-height: 1.4;
+    }
+
+    .nav-source-detail { padding-left: 18px; }
+
+    .nav-source-detail-table {
+        display: grid;
+        grid-template-columns: 1fr auto;
+        column-gap: 16px;
+        row-gap: 2px;
+        margin-bottom: 4px;
+    }
+
+    .nav-sdr-label {
+        font-size: 11px;
+        color: var(--text-muted);
+        line-height: 1.6;
+    }
+
+    .nav-sdr-count {
+        font-size: 11px;
+        color: var(--text);
+        text-align: right;
+        font-variant-numeric: tabular-nums;
+        line-height: 1.6;
+    }
+
+    .nav-source-timestamp {
+        font-size: 10px;
+        color: var(--text-muted);
+        margin-top: 2px;
+    }
+
+    .nav-source-inner-divider {
+        border: none;
+        border-top: 1px solid var(--border);
+        margin: 8px 0;
+    }
+
+    .nav-source-sync-btn {
+        margin-left: auto;
+        font-size: 11px;
+        font-family: inherit;
+        padding: 3px 10px;
+        border-radius: 5px;
+        border: 1px solid var(--border);
+        background: var(--surface);
+        color: var(--text-muted);
+        cursor: pointer;
+        transition: all 0.15s;
+    }
+    .nav-source-sync-btn:hover:not(:disabled) {
+        background: var(--surface-hover);
+        color: var(--text);
+        border-color: var(--accent);
+    }
+    .nav-source-sync-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+    .nav-source-sync-link {
+        display: block;
+        text-align: center;
+        padding: 8px 16px;
+        font-size: 11px;
+        color: var(--accent);
+        text-decoration: none;
+        border-top: 1px solid var(--border);
+        transition: background 0.15s;
+    }
+    .nav-source-sync-link:hover { background: var(--surface-hover); }
+    .nav-source-sync-link {
+        display: block;
+        text-align: center;
+        padding: 8px 16px;
+        font-size: 11px;
+        color: var(--accent);
+        text-decoration: none;
+        border-top: 1px solid var(--border);
+        transition: background 0.15s;
+    }
+    .nav-source-sync-link:hover { background: var(--surface-hover); }
+
+    /* CSS tooltips */
+    [data-tooltip] { position: relative; }
+    [data-tooltip]::after {
+        content: attr(data-tooltip);
+        position: absolute;
+        bottom: calc(100% + 6px);
+        left: 0;
+        background: #0f1117;
+        border: 1px solid var(--border);
+        color: var(--text-muted);
+        font-size: 11px;
+        font-weight: 400;
+        white-space: nowrap;
+        padding: 4px 8px;
+        border-radius: 5px;
+        pointer-events: none;
+        opacity: 0;
+        transition: opacity 0.15s ease;
+        z-index: 300;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    }
+    [data-tooltip]:hover::after { opacity: 1; }
+
+    /* ── Changelog panel ─────────────────────────────────────────────────── */
+    #navChangelogPopup { width: 310px; }
+
+    .nav-changelog-body { padding: 12px 16px 14px; }
+
+    .nav-changelog-version { margin-bottom: 12px; }
+    .nav-changelog-version:last-child { margin-bottom: 0; }
+
+    .nav-changelog-version-label {
+        font-size: 11px;
+        font-weight: 600;
+        color: var(--accent);
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        margin-bottom: 4px;
+    }
+
+    .nav-changelog-version ul {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+    }
+
+    .nav-changelog-version ul li {
+        font-size: 12px;
+        color: var(--text-muted);
+        line-height: 1.5;
+        padding: 2px 0 2px 12px;
+        position: relative;
+    }
+
+    .nav-changelog-version ul li::before {
+        content: '–';
+        position: absolute;
+        left: 0;
+        color: var(--border);
+    }
+
+    .nav-changelog-footer {
+        display: block;
+        margin-top: 10px;
+        padding-top: 10px;
+        border-top: 1px solid var(--border);
+        font-size: 12px;
+        color: var(--accent);
+        text-decoration: none;
+        text-align: right;
+    }
+    .nav-changelog-footer:hover { text-decoration: underline; }
+
+    /* ── No-auth warning banner ─────────────────────────────────────────── */
+    .nav-auth-warning {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        padding: 8px 20px;
+        background: rgba(234, 179, 8, 0.12);
+        border-bottom: 1px solid rgba(234, 179, 8, 0.3);
+        color: #eab308;
+        font-size: 12px;
+        line-height: 1.4;
+    }
+    .nav-auth-warning svg {
+        width: 14px;
+        height: 14px;
+        flex-shrink: 0;
+    }
+
+    /* ── Secret expiry warning banner ──────────────────────────────────── */
+    .nav-expiry-banner {
+        display: none;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        padding: 8px 20px;
+        font-size: 12px;
+        line-height: 1.4;
+    }
+    .nav-expiry-banner.visible { display: flex; }
+    .nav-expiry-banner svg {
+        width: 14px;
+        height: 14px;
+        flex-shrink: 0;
+    }
+    .nav-expiry-banner.warning {
+        background: rgba(234, 179, 8, 0.12);
+        border-bottom: 1px solid rgba(234, 179, 8, 0.3);
+        color: #eab308;
+    }
+    .nav-expiry-banner.critical,
+    .nav-expiry-banner.expired {
+        background: rgba(239, 68, 68, 0.12);
+        border-bottom: 1px solid rgba(239, 68, 68, 0.3);
+        color: #ef4444;
+    }
+    .nav-expiry-banner a {
+        color: inherit;
+        text-decoration: underline;
+        text-underline-offset: 2px;
+    }
+    .nav-expiry-banner a:hover { opacity: 0.8; }
+    .nav-expiry-dismiss {
+        background: none;
+        border: none;
+        color: inherit;
+        cursor: pointer;
+        padding: 0 4px;
+        font-size: 16px;
+        line-height: 1;
+        opacity: 0.6;
+    }
+    .nav-expiry-dismiss:hover { opacity: 1; }
+
+    /* ── Theme toggle ────────────────────────────────────────────────────── */
+    .nav-theme-toggle {
+        background: none;
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        padding: 5px 8px;
+        cursor: pointer;
+        color: var(--text-muted);
+        display: inline-flex;
+        align-items: center;
+        transition: all 0.15s;
+    }
+    .nav-theme-toggle:hover { border-color: var(--accent); color: var(--accent); }
+    .nav-theme-toggle svg { width: 16px; height: 16px; }
+    .nav-theme-toggle .icon-sun,
+    .nav-theme-toggle .icon-moon { display: none; }
+    [data-theme="dark"] .nav-theme-toggle .icon-sun,
+    :root:not([data-theme]) .nav-theme-toggle .icon-sun { display: block; }
+    [data-theme="light"] .nav-theme-toggle .icon-moon { display: block; }
+</style>
+
+{# ── Nav HTML ──────────────────────────────────────────────────────────────── #}
+<header class="nav-header">
+    <div class="nav-header-left">
+        <img class="nav-logo" src="/static/icon.png" alt="Logo">
+        <h1>{{ app_name }} {% if app_version %}<span class="version">{{ app_version }}</span>{% endif %}</h1>
+    </div>
+    <div class="nav-header-actions">
+
+        <!-- Data sources popup -->
+        <div class="nav-panel-wrapper" id="navSourcesWrapper">
+            <button class="nav-icon-btn" id="navSourcesBtn"
+                    onclick="navTogglePanel('sources')"
+                    aria-label="Data sources"
+                    aria-expanded="false"
+                    aria-haspopup="dialog"
+                    title="Data sources">
+                <svg viewBox="0 0 16 16" fill="none" stroke="currentColor"
+                     stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"
+                     aria-hidden="true">
+                    <path d="M2 5l6-3 6 3-6 3-6-3z"/>
+                    <path d="M2 9l6 3 6-3"/>
+                    <path d="M2 12l6 3 6-3"/>
+                </svg>
+                <span class="nav-status-badge" id="navStatusBadge" hidden aria-hidden="true"></span>
+                <span class="nav-sync-badge" id="navSyncBadge" hidden aria-hidden="true"></span>
+            </button>
+            <div class="nav-panel-popup" id="navSourcesPopup"
+                 role="dialog" aria-label="Data sources">
+                <div class="nav-panel-popup-header">Data sources</div>
+                <div id="navSourcesList" aria-live="polite">
+                    <div class="nav-source-row">
+                        <span class="nav-source-meta">Checking…</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Changelog popup -->
+        <div class="nav-panel-wrapper" id="navChangelogWrapper">
+            <button class="nav-icon-btn" id="navChangelogBtn"
+                    onclick="navTogglePanel('changelog')"
+                    aria-label="Recent changes"
+                    aria-expanded="false"
+                    aria-haspopup="dialog"
+                    title="Recent changes">
+                <svg viewBox="0 0 16 16" fill="none" stroke="currentColor"
+                     stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"
+                     aria-hidden="true">
+                    <circle cx="8" cy="8" r="6.5"/>
+                    <polyline points="8,4.5 8,8 10.5,10"/>
+                </svg>
+            </button>
+            <div class="nav-panel-popup" id="navChangelogPopup"
+                 role="dialog" aria-label="Recent changes">
+                <div class="nav-panel-popup-header">Recent changes</div>
+                <div class="nav-changelog-body" id="navChangelogBody">
+                    <p style="color:var(--text-muted);font-size:12px;">Loading...</p>
+                </div>
+            </div>
+        </div>
+
+        <span class="nav-separator"></span>
+
+        <!-- Nav links -->
+        <a href="/" class="nav-btn">Chat</a>
+        {% if has_timeline %}<a href="/timeline" class="nav-btn">Timeline</a>{% endif %}
+        <a href="/trends" class="nav-btn">Trends</a>
+        {% if has_admin %}<a href="/admin" class="nav-btn">Administration</a>{% endif %}
+
+        <span class="nav-separator"></span>
+
+        <!-- Theme toggle -->
+        <button class="nav-theme-toggle" onclick="toggleTheme()" title="Toggle light/dark mode">
+            <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
+            <svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/></svg>
+        </button>
+
+        {% if auth_enabled %}
+        <span class="nav-user-name">{{ user_name }}</span>
+        <a href="/logout" class="nav-btn">Log out</a>
+        {% endif %}
+    </div>
+</header>
+
+{% if not auth_enabled %}
+<div class="nav-auth-warning" role="alert">
+    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"
+         stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M8 1.5L1 14h14L8 1.5z"/><path d="M8 6v4"/><circle cx="8" cy="12" r="0.5" fill="currentColor"/>
+    </svg>
+    <span>Authentication is disabled — this instance is accessible without login. Do not expose to the public internet without network-level access controls.</span>
+</div>
+{% endif %}
+
+{% if has_admin %}
+<div class="nav-expiry-banner" id="navExpiryBanner" role="alert">
+    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"
+         stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M8 1.5L1 14h14L8 1.5z"/><path d="M8 6v4"/><circle cx="8" cy="12" r="0.5" fill="currentColor"/>
+    </svg>
+    <span id="navExpiryText"></span>
+    <button class="nav-expiry-dismiss" onclick="document.getElementById('navExpiryBanner').classList.remove('visible')" aria-label="Dismiss">&times;</button>
+</div>
+{% endif %}
+
+{# ── Nav JS ────────────────────────────────────────────────────────────────── #}
+<script>
+// ── CSRF: add X-Requested-With to all mutating fetch calls ───────────────
+// The server rejects POST/PUT/DELETE requests to /api/* without this header.
+// Browsers block cross-origin requests with custom headers (CORS preflight),
+// preventing CSRF attacks.
+(function() {
+    var _nativeFetch = window.fetch;
+    window.fetch = function(url, opts) {
+        opts = opts || {};
+        var method = (opts.method || 'GET').toUpperCase();
+        if (method !== 'GET' && method !== 'HEAD') {
+            opts.headers = Object.assign({'X-Requested-With': 'fetch'}, opts.headers || {});
+        }
+        return _nativeFetch.call(this, url, opts);
+    };
+})();
+
+(function() {
+    // ── Theme toggle ──────────────────────────────────────────────────────
+    window.toggleTheme = function() {
+        var cur = document.documentElement.getAttribute('data-theme') || 'dark';
+        var next = cur === 'dark' ? 'light' : 'dark';
+        document.documentElement.setAttribute('data-theme', next);
+        try { localStorage.setItem('timeline-theme', next); } catch(e) {}
+    };
+
+    // ── Date formatting helper ────────────────────────────────────────────
+    function navFmtDate(iso) {
+        if (!iso) return null;
+        return new Date(iso).toLocaleString(undefined, {
+            month: 'short', day: 'numeric',
+            hour: 'numeric', minute: '2-digit',
+        });
+    }
+
+    // ── Panel toggle helpers ──────────────────────────────────────────────
+    var NAV_PANELS = {
+        sources:   { popup: 'navSourcesPopup',   btn: 'navSourcesBtn'   },
+        changelog: { popup: 'navChangelogPopup',  btn: 'navChangelogBtn' },
+    };
+
+    window.navTogglePanel = function(name) {
+        var target  = NAV_PANELS[name];
+        var popup   = document.getElementById(target.popup);
+        var btn     = document.getElementById(target.btn);
+        var opening = !popup.classList.contains('visible');
+
+        // Close all panels first
+        for (var k in NAV_PANELS) {
+            document.getElementById(NAV_PANELS[k].popup).classList.remove('visible');
+            document.getElementById(NAV_PANELS[k].btn).setAttribute('aria-expanded', 'false');
+        }
+
+        if (opening) {
+            popup.classList.add('visible');
+            btn.setAttribute('aria-expanded', 'true');
+        }
+    };
+
+    window.navClosePanel = function(name) {
+        var cfg = NAV_PANELS[name];
+        if (!cfg) return;
+        document.getElementById(cfg.popup).classList.remove('visible');
+        document.getElementById(cfg.btn).setAttribute('aria-expanded', 'false');
+    };
+
+    // Close any open panel when clicking outside
+    document.addEventListener('click', function(e) {
+        for (var name in NAV_PANELS) {
+            var wrapperId = name === 'sources' ? 'navSourcesWrapper' : 'navChangelogWrapper';
+            var wrapper = document.getElementById(wrapperId);
+            if (wrapper && !wrapper.contains(e.target)) {
+                document.getElementById(NAV_PANELS[name].popup).classList.remove('visible');
+                document.getElementById(NAV_PANELS[name].btn).setAttribute('aria-expanded', 'false');
+            }
+        }
+    });
+
+    // ── Sources panel — sync-aware ──────────────────────────────────────
+    var NAV_CW_LABELS = {
+        tickets:      'Ticket summaries',
+        time_entries: 'Time entries',
+        agreements:   'Agreements',
+        ticket_notes: 'Notes',
+    };
+    var NAV_CIPP_LABELS = {
+        cipp_tenants:    'Tenants',
+        cipp_licenses:   'Licenses',
+        cipp_alerts:     'Alerts',
+        customer_map:    'Client mappings',
+    };
+    var NAV_DUO_LABELS = {
+        duo_users: 'Users',
+    };
+
+    function navBuildDetailSection(items, timestamp, durationSecs) {
+        var section = document.createElement('div');
+        section.className = 'nav-source-detail';
+
+        if (items.length) {
+            var table = document.createElement('div');
+            table.className = 'nav-source-detail-table';
+            for (var i = 0; i < items.length; i++) {
+                var l = document.createElement('div');
+                l.className = 'nav-sdr-label';
+                l.textContent = items[i][0];
+                var c = document.createElement('div');
+                c.className = 'nav-sdr-count';
+                c.textContent = items[i][1].toLocaleString();
+                table.appendChild(l);
+                table.appendChild(c);
+            }
+            section.appendChild(table);
+        }
+
+        var ts = document.createElement('div');
+        ts.className = 'nav-source-timestamp';
+        if (timestamp) {
+            var dur = durationSecs != null ? ' in ' + Math.round(durationSecs) + 's' : '';
+            ts.textContent = 'Synced ' + navFmtDate(timestamp) + dur;
+        } else {
+            ts.textContent = 'Never synced';
+        }
+        section.appendChild(ts);
+        return section;
+    }
+
+    function navUpdateSourcesPanel(data) {
+        var sources    = data.sources || {};
+        var statusBadge = document.getElementById('navStatusBadge');
+        var syncBadge  = document.getElementById('navSyncBadge');
+        var listEl     = document.getElementById('navSourcesList');
+
+        // Determine overall health and sync state
+        var anySyncing = false;
+        for (var sk in sources) {
+            if (sources[sk].syncing) { anySyncing = true; break; }
+        }
+
+        // Update badges
+        var showPulsing = anySyncing || data.initial_sync_pending;
+        syncBadge.hidden = !showPulsing;
+        statusBadge.hidden = showPulsing; // hide static badge while pulsing
+        if (!showPulsing) {
+            statusBadge.hidden = false;
+            statusBadge.className = 'nav-status-badge ' + (data.ok ? 'ok' : 'error');
+        }
+
+        // Show friendly message during initial sync
+        if (data.initial_sync_pending) {
+            listEl.innerHTML =
+                '<div class="nav-source-row">' +
+                '<div class="nav-source-header">' +
+                '<span class="nav-source-dot syncing"></span>' +
+                '<span class="nav-source-label">Initial sync</span>' +
+                '</div>' +
+                '<div class="nav-source-meta" style="color:var(--text-muted)">' +
+                'Waiting for the first data sync to complete. This usually takes a few minutes after deployment. ' +
+                'Check container logs for progress.' +
+                '</div>' +
+                '</div>';
+            return;
+        }
+
+        // Show issues if not ok
+        if (!data.ok && data.issues && data.issues.length) {
+            var issueHtml = data.issues.map(function(i) {
+                var d = document.createElement('div');
+                d.textContent = i;
+                return '<div class="nav-source-meta" style="color:var(--error)">' + d.innerHTML + '</div>';
+            }).join('');
+            listEl.innerHTML =
+                '<div class="nav-source-row">' +
+                '<div class="nav-source-header">' +
+                '<span class="nav-source-dot error"></span>' +
+                '<span class="nav-source-label">System</span>' +
+                '</div>' +
+                issueHtml +
+                '</div>';
+            return;
+        }
+
+        if (Object.keys(sources).length === 0) {
+            listEl.innerHTML =
+                '<div class="nav-source-row"><span class="nav-source-meta">No data sources configured.</span></div>';
+            return;
+        }
+
+        listEl.innerHTML = '';
+        for (var key in sources) {
+            var src = sources[key];
+            var row = document.createElement('div');
+            row.className = 'nav-source-row';
+
+            var dotClass = src.syncing ? 'syncing' : (src.last_sync ? 'ok' : 'warn');
+            var header = document.createElement('div');
+            header.className = 'nav-source-header';
+
+            var dot = document.createElement('span');
+            dot.className = 'nav-source-dot ' + dotClass;
+
+            var labelEl = document.createElement('span');
+            labelEl.className = 'nav-source-label';
+            labelEl.textContent = src.label;
+
+            var syncBtn = document.createElement('button');
+            syncBtn.className = 'nav-source-sync-btn';
+            syncBtn.setAttribute('aria-label', 'Sync ' + src.label);
+            syncBtn.disabled = src.syncing;
+            syncBtn.textContent = src.syncing ? 'Syncing…' : 'Sync now';
+            (function(k, lbl) {
+                syncBtn.addEventListener('click', function() { navTriggerSync(k, lbl); });
+            })(key, src.label);
+
+            header.appendChild(dot);
+            header.appendChild(labelEl);
+            header.appendChild(syncBtn);
+            row.appendChild(header);
+
+            var rc = src.record_counts || {};
+
+            if (src.syncing) {
+                var meta = document.createElement('div');
+                meta.className = 'nav-source-meta';
+                meta.textContent = 'Syncing now…';
+                row.appendChild(meta);
+
+            } else if (key === 'cw') {
+                var mainKeys = ['tickets', 'time_entries', 'agreements'];
+                var mainItems = [];
+                for (var mi = 0; mi < mainKeys.length; mi++) {
+                    if (rc[mainKeys[mi]] != null) mainItems.push([NAV_CW_LABELS[mainKeys[mi]], rc[mainKeys[mi]]]);
+                }
+                row.appendChild(navBuildDetailSection(mainItems, src.last_sync, src.last_sync_duration));
+
+                if (rc.ticket_notes != null || src.last_notes_sync) {
+                    var divider = document.createElement('div');
+                    divider.className = 'nav-source-inner-divider';
+                    row.appendChild(divider);
+                    var noteItems = rc.ticket_notes != null ? [['Notes', rc.ticket_notes]] : [];
+                    row.appendChild(navBuildDetailSection(noteItems, src.last_notes_sync, null));
+                }
+
+            } else if (key === 'cipp') {
+                var cippKeys = ['cipp_tenants', 'cipp_licenses', 'cipp_alerts', 'customer_map'];
+                var cippItems = [];
+                for (var ci = 0; ci < cippKeys.length; ci++) {
+                    if (rc[cippKeys[ci]] != null) cippItems.push([NAV_CIPP_LABELS[cippKeys[ci]], rc[cippKeys[ci]]]);
+                }
+                row.appendChild(navBuildDetailSection(cippItems, src.last_sync, src.last_sync_duration));
+
+            } else {
+                // Generic layout for duo, huntress, or future sources
+                var genericItems = [];
+                for (var gk in rc) { genericItems.push([gk, rc[gk]]); }
+                row.appendChild(navBuildDetailSection(genericItems, src.last_sync, src.last_sync_duration));
+            }
+
+            listEl.appendChild(row);
+        }
+
+        // Show "View Sync Details" link for admin users
+        {% if has_admin %}
+        var syncLink = document.createElement('a');
+        syncLink.href = '/admin#sync';
+        syncLink.className = 'nav-source-sync-link';
+        syncLink.textContent = 'View Sync Details';
+        syncLink.addEventListener('click', function(e) {
+            if (window.location.pathname === '/admin' || window.location.pathname === '/admin/permissions') {
+                e.preventDefault();
+                if (typeof window.switchTab === 'function') window.switchTab('sync');
+            }
+        });
+        listEl.appendChild(syncLink);
+        {% endif %}
+    }
+
+    async function navTriggerSync(sourceKey, sourceLabel) {
+        var btns = document.querySelectorAll('.nav-source-sync-btn');
+        var btn = null;
+        for (var i = 0; i < btns.length; i++) {
+            if (btns[i].getAttribute('aria-label') === 'Sync ' + sourceLabel) { btn = btns[i]; break; }
+        }
+        if (btn) { btn.disabled = true; btn.textContent = 'Syncing…'; }
+
+        try {
+            var resp = await fetch('/api/sync', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ source: sourceKey }),
+            });
+            var data = await resp.json();
+            if (!data.ok) {
+                if (btn) { btn.disabled = false; btn.textContent = 'Sync now'; }
+            }
+        } catch (err) {
+            if (btn) { btn.disabled = false; btn.textContent = 'Sync now'; }
+        }
+
+        // Poll immediately to pick up the syncing state
+        navPollStatus();
+    }
+
+    // ── Status poller ─────────────────────────────────────────────────────
+    var navPollTimer = null;
+
+    async function navPollStatus() {
+        try {
+            var resp = await fetch('/api/status');
+            var data = await resp.json();
+            navUpdateSourcesPanel(data);
+            var anySyncing = false;
+            var sources = data.sources || {};
+            for (var sk in sources) { if (sources[sk].syncing) { anySyncing = true; break; } }
+            var needsFastPoll = anySyncing || data.initial_sync_pending;
+            clearTimeout(navPollTimer);
+            navPollTimer = setTimeout(navPollStatus, needsFastPoll ? 5000 : 30000);
+        } catch (_) {
+            clearTimeout(navPollTimer);
+            navPollTimer = setTimeout(navPollStatus, 30000);
+        }
+    }
+
+    // Start polling
+    navPollStatus();
+
+    // ── Recent changes popup ──────────────────────────────────────────────
+    (async function navLoadRecentChanges() {
+        try {
+            var resp = await fetch('/api/changelog?limit=5');
+            var entries = await resp.json();
+            var body = document.getElementById('navChangelogBody');
+            if (!entries.length) {
+                body.innerHTML = '<p style="color:var(--text-muted);font-size:12px;">No changelog entries.</p>';
+                return;
+            }
+            var html = '';
+            entries.forEach(function(e) {
+                html += '<div class="nav-changelog-version">';
+                html += '<div class="nav-changelog-version-label">v' + e.version + ' — ' + e.date + '</div>';
+                html += '<ul>';
+                e.changes.forEach(function(c) {
+                    var plain = c.replace(/<[^>]+>/g, '').replace(/ — .*/, '');
+                    var d = document.createElement('div');
+                    d.textContent = plain;
+                    html += '<li>' + d.innerHTML + '</li>';
+                });
+                html += '</ul></div>';
+            });
+            html += '<a href="/changelog" class="nav-changelog-footer" onclick="navClosePanel(\'changelog\')">View all changes →</a>';
+            body.innerHTML = html;
+        } catch (e) {
+            console.error('Failed to load changelog:', e);
+        }
+    })();
+
+    // ── Secret expiry banner ─────────────────────────────────────────────
+    (async function navCheckSecretExpiry() {
+        var banner = document.getElementById('navExpiryBanner');
+        if (!banner) return; // not an admin user
+
+        // Only check once per session to avoid repeated Graph API calls
+        try {
+            var dismissed = sessionStorage.getItem('expiry-banner-dismissed');
+            if (dismissed) return;
+        } catch(e) {}
+
+        try {
+            var resp = await fetch('/api/admin/secret-expiry');
+            if (!resp.ok) return;
+            var data = await resp.json();
+            var warnings = data.warnings || [];
+            if (!warnings.length) return;
+
+            // Prioritise auth failures over expiry warnings — auth_failed
+            // means the secret is actively broken right now.
+            var authFailed = warnings.find(function(w) { return w.status === 'auth_failed'; });
+            var w = authFailed || warnings[0];
+            var status = w.status;
+            var msg;
+            if (status === 'auth_failed') {
+                msg = 'The configured client secret failed authentication. Users cannot log in.';
+            } else if (status === 'expired') {
+                msg = w.secret_name + ' expired ' + Math.abs(w.days_left) + ' day(s) ago';
+            } else {
+                msg = w.secret_name + ' expires in ' + w.days_left + ' day(s)';
+            }
+
+            var textEl = document.getElementById('navExpiryText');
+            textEl.textContent = '';
+            var strong = document.createElement('strong');
+            if (status === 'auth_failed') {
+                strong.textContent = 'Azure authentication failed: ';
+            } else {
+                strong.textContent = 'Azure secret ' + (status === 'expired' ? 'expired' : 'expiring soon') + ': ';
+            }
+            textEl.appendChild(strong);
+            textEl.appendChild(document.createTextNode(msg + ' '));
+            var link = document.createElement('a');
+            link.href = '/admin#settings';
+            link.textContent = 'Manage settings';
+            textEl.appendChild(link);
+            if (data.docs_url) {
+                textEl.appendChild(document.createTextNode(' · '));
+                var docsLink = document.createElement('a');
+                docsLink.href = data.docs_url;
+                docsLink.target = '_blank';
+                docsLink.rel = 'noopener';
+                docsLink.textContent = 'Documentation';
+                textEl.appendChild(docsLink);
+            }
+
+            // auth_failed uses the critical/expired styling (red)
+            var cssClass = (status === 'auth_failed') ? 'critical' : status;
+            banner.className = 'nav-expiry-banner visible ' + cssClass;
+
+            // Override dismiss to set session flag
+            var dismissBtn = banner.querySelector('.nav-expiry-dismiss');
+            if (dismissBtn) {
+                dismissBtn.onclick = function() {
+                    banner.classList.remove('visible');
+                    try { sessionStorage.setItem('expiry-banner-dismissed', '1'); } catch(e) {}
+                };
+            }
+        } catch (err) {
+            // Silently ignore — expiry check is best-effort
+        }
+    })();
+})();
+</script>

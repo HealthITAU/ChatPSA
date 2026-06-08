@@ -1,0 +1,1089 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Trends — {{ app_name }}</title>
+    <link rel="icon" type="image/x-icon" href="/static/favicon.ico">
+    <link rel="icon" type="image/png" sizes="32x32" href="/static/favicon-32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="/static/favicon-16.png">
+    <link rel="apple-touch-icon" sizes="180x180" href="/static/apple-touch-icon.png">
+    <style>
+        :root, [data-theme="dark"] {
+            --bg: #0f1117;
+            --surface: #1a1d27;
+            --surface-hover: #242736;
+            --border: #2e3142;
+            --text: #e1e4ed;
+            --text-muted: #8b8fa3;
+            --accent: #6c63ff;
+            --success: #34d399;
+            --warning: #fbbf24;
+            --error: #f87171;
+        }
+        [data-theme="light"] {
+            --bg: #f5f6f8;
+            --surface: #ffffff;
+            --surface-hover: #f0f1f4;
+            --border: #dcdee4;
+            --text: #1a1d27;
+            --text-muted: #6b7084;
+            --accent: #5b52e0;
+            --success: #16a369;
+            --warning: #d97706;
+            --error: #dc2626;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+        }
+
+        .btn {
+            padding: 6px 14px;
+            border-radius: 6px;
+            border: 1px solid var(--border);
+            background: var(--surface);
+            color: var(--text);
+            font-size: 13px;
+            cursor: pointer;
+            text-decoration: none;
+            transition: all 0.15s;
+        }
+        .btn:hover { background: var(--surface-hover); border-color: var(--accent); }
+
+        .btn-refresh {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        /* ── Layout ─────────────────────────────────────────────────────────── */
+        .page { padding: 24px 32px; }
+
+        .section-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 16px;
+        }
+        .section-title {
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: var(--text-muted);
+        }
+        .section-meta {
+            font-size: 11px;
+            color: var(--text-muted);
+        }
+
+        /* ── Filter bar ─────────────────────────────────────────────────────── */
+        .filter-bar {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+
+        .filter-bar label {
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            color: var(--text-muted);
+            flex-shrink: 0;
+        }
+
+        .filter-pills {
+            display: flex;
+            gap: 6px;
+            flex-wrap: wrap;
+        }
+
+        .filter-pill {
+            padding: 5px 12px;
+            border-radius: 99px;
+            border: 1px solid var(--border);
+            background: transparent;
+            color: var(--text-muted);
+            font-size: 12px;
+            cursor: pointer;
+            transition: all 0.15s;
+            white-space: nowrap;
+        }
+        .filter-pill:hover { border-color: var(--accent); color: var(--text); }
+        .filter-pill.active {
+            background: rgba(108,99,255,0.15);
+            border-color: var(--accent);
+            color: var(--accent);
+            font-weight: 600;
+        }
+
+        .filter-divider {
+            width: 1px;
+            height: 20px;
+            background: var(--border);
+            flex-shrink: 0;
+        }
+
+        .filter-search {
+            padding: 5px 12px;
+            border-radius: 99px;
+            border: 1px solid var(--border);
+            background: var(--surface);
+            color: var(--text);
+            font-size: 12px;
+            outline: none;
+            width: 180px;
+            transition: border-color 0.15s;
+        }
+        .filter-search:focus { border-color: var(--accent); }
+        .filter-search::placeholder { color: var(--text-muted); }
+
+        .filter-count {
+            font-size: 11px;
+            color: var(--text-muted);
+            margin-left: auto;
+            flex-shrink: 0;
+        }
+
+        /* ── Kanban board ───────────────────────────────────────────────────── */
+        .kanban {
+            display: flex;
+            gap: 16px;
+            margin-bottom: 32px;
+            overflow-x: auto;
+            padding-bottom: 4px;
+        }
+
+        .kanban-column {
+            flex: 1;
+            min-width: 280px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        /* When filtering to a single service, cards fill a responsive grid */
+        .kanban.single-service {
+            display: block;
+        }
+        .kanban.single-service .kanban-column {
+            max-width: none;
+            min-width: 0;
+        }
+        .kanban.single-service .kanban-column-cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 12px;
+        }
+
+        .kanban-column-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 10px 14px;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 10px 10px 0 0;
+            position: sticky;
+            top: 0;
+        }
+
+        .kanban-column-title {
+            font-size: 13px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .kanban-column-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            flex-shrink: 0;
+        }
+
+        .kanban-column-count {
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--text-muted);
+            background: var(--bg);
+            padding: 1px 8px;
+            border-radius: 99px;
+        }
+
+        .kanban-column-cards {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            min-height: 60px;
+        }
+
+        .kanban-empty {
+            font-size: 12px;
+            color: var(--text-muted);
+            text-align: center;
+            padding: 20px 12px;
+            background: var(--surface);
+            border: 1px dashed var(--border);
+            border-radius: 10px;
+            opacity: 0.7;
+        }
+
+        /* ── Insight cards ───────────────────────────────────────────────────── */
+        .insight-card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 14px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            transition: border-color 0.15s, opacity 0.3s;
+        }
+        .insight-card:hover { border-color: var(--accent); }
+        .insight-card.severity-high  { border-left: 3px solid var(--error); }
+        .insight-card.severity-medium { border-left: 3px solid var(--warning); }
+        .insight-card.severity-low   { border-left: 3px solid var(--text-muted); }
+        .insight-card.filtered-out {
+            display: none;
+        }
+
+        .insight-top {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 8px;
+        }
+
+        .insight-type {
+            font-size: 10px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            padding: 2px 7px;
+            border-radius: 99px;
+        }
+        .type-ticket_spike   { background: rgba(248,113,113,0.15); color: var(--error); }
+        .type-unused_licenses { background: rgba(251,191,36,0.15);  color: var(--warning); }
+        .type-overdue        { background: rgba(248,113,113,0.15); color: var(--error); }
+        .type-stale_priority { background: rgba(248,113,113,0.15); color: var(--error); }
+        .type-quiet_client   { background: rgba(139,143,163,0.15); color: var(--text-muted); }
+        .type-duo_bypass     { background: rgba(248,113,113,0.15); color: var(--error); }
+        .type-duo_inactive   { background: rgba(251,191,36,0.15);  color: var(--warning); }
+
+        .insight-metric {
+            font-size: 20px;
+            font-weight: 700;
+            color: var(--accent);
+            white-space: nowrap;
+        }
+
+        .insight-company {
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--text);
+        }
+
+        .insight-detail {
+            font-size: 12px;
+            color: var(--text-muted);
+            line-height: 1.5;
+        }
+
+        .insight-chips {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .insight-chip {
+            font-size: 11px;
+            color: var(--accent);
+            background: rgba(108,99,255,0.08);
+            border: 1px solid rgba(108,99,255,0.2);
+            border-radius: 6px;
+            padding: 4px 9px;
+            cursor: pointer;
+            text-align: left;
+            text-decoration: none;
+            transition: background 0.15s;
+            display: block;
+        }
+        .insight-chip:hover {
+            background: rgba(108,99,255,0.18);
+            border-color: var(--accent);
+        }
+
+        /* ── Weekly chart ────────────────────────────────────────────────────── */
+
+        .weekly-chart {
+            display: flex;
+            align-items: flex-end;
+            gap: 6px;
+            height: 100px;
+        }
+        .week-col {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 2px;
+            height: 100%;
+            justify-content: flex-end;
+        }
+        .week-bars {
+            display: flex;
+            align-items: flex-end;
+            gap: 2px;
+            width: 100%;
+            height: 88px;
+            justify-content: center;
+        }
+        .week-bar {
+            flex: 1;
+            border-radius: 3px 3px 0 0;
+            min-height: 2px;
+            position: relative;
+            cursor: default;
+            transition: opacity 0.15s;
+        }
+        .week-bar:hover { opacity: 0.8; }
+        .week-bar.helpdesk  { background: var(--accent); }
+        .week-label {
+            font-size: 9px;
+            color: var(--text-muted);
+            text-align: center;
+            white-space: nowrap;
+        }
+
+        .chart-legend {
+            display: flex;
+            gap: 16px;
+            margin-top: 10px;
+            font-size: 11px;
+            color: var(--text-muted);
+        }
+        .legend-dot {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            border-radius: 2px;
+            margin-right: 4px;
+        }
+
+        /* ── Pinned cards ────────────────────────────────────────────────────── */
+        .pins-list {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            margin-bottom: 32px;
+        }
+
+        .pin-card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 16px 20px;
+        }
+
+        .pin-header {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 12px;
+            margin-bottom: 8px;
+        }
+
+        .pin-title { font-size: 15px; font-weight: 600; }
+
+        .pin-dismiss {
+            background: none;
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            color: var(--text-muted);
+            font-size: 11px;
+            padding: 3px 8px;
+            cursor: pointer;
+            white-space: nowrap;
+            flex-shrink: 0;
+            transition: color 0.15s, border-color 0.15s;
+        }
+        .pin-dismiss:hover { color: var(--error); border-color: var(--error); }
+
+        .pin-summary {
+            font-size: 13px;
+            color: var(--text-muted);
+            line-height: 1.6;
+            margin-bottom: 10px;
+        }
+
+        .pin-meta {
+            font-size: 11px;
+            color: var(--text-muted);
+            display: flex;
+            gap: 16px;
+            flex-wrap: wrap;
+        }
+
+        .pin-sql-toggle {
+            background: none;
+            border: none;
+            color: var(--text-muted);
+            font-size: 11px;
+            cursor: pointer;
+            padding: 0;
+            margin-top: 8px;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+        }
+        .pin-sql-toggle:hover { color: var(--text); }
+
+        .pin-sql-content {
+            display: none;
+            margin-top: 8px;
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 10px 12px;
+            font-family: "SF Mono", "Fira Code", monospace;
+            font-size: 11px;
+            color: var(--text-muted);
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+        .pin-sql-content.visible { display: block; }
+
+        .pin-type-badge {
+            font-size: 10px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            padding: 2px 7px;
+            border-radius: 4px;
+            flex-shrink: 0;
+        }
+        .pin-type-badge.finding {
+            background: rgba(108,99,255,0.15);
+            color: var(--accent);
+        }
+        .pin-type-badge.query {
+            background: rgba(52,199,89,0.15);
+            color: #32c759;
+        }
+
+        .pin-results {
+            margin-top: 10px;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            overflow: hidden;
+        }
+        .pin-results table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 12px;
+        }
+        .pin-results th {
+            background: var(--bg);
+            font-weight: 600;
+            text-align: left;
+            padding: 6px 10px;
+            border-bottom: 1px solid var(--border);
+            font-size: 11px;
+            color: var(--text-muted);
+        }
+        .pin-results td {
+            padding: 5px 10px;
+            border-bottom: 1px solid var(--border);
+        }
+        .pin-results tr:last-child td { border-bottom: none; }
+        .pin-results-empty {
+            font-size: 12px;
+            color: var(--text-muted);
+            padding: 10px;
+            font-style: italic;
+        }
+        .pin-results-error {
+            font-size: 12px;
+            color: var(--error);
+            padding: 10px;
+        }
+
+        /* ── Empty states ────────────────────────────────────────────────────── */
+        .empty {
+            color: var(--text-muted);
+            font-size: 13px;
+            text-align: center;
+            padding: 32px 0;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            margin-bottom: 32px;
+        }
+        .empty p { margin-bottom: 6px; }
+        .empty .sub { font-size: 12px; opacity: 0.7; }
+
+        /* ── Accordion ──────────────────────────────────────────────────────── */
+        .accordion {
+            margin-bottom: 24px;
+        }
+
+        .accordion-trigger {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            width: 100%;
+            padding: 12px 16px;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            color: var(--text);
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: border-color 0.15s, border-radius 0.15s;
+            user-select: none;
+        }
+        .accordion-trigger:hover { border-color: var(--accent); }
+
+        .accordion-trigger-left {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .accordion-trigger-right {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 11px;
+            color: var(--text-muted);
+            font-weight: 400;
+        }
+
+        .accordion-chevron {
+            display: inline-flex;
+            transition: transform 0.2s ease;
+        }
+        .accordion.open .accordion-chevron {
+            transform: rotate(90deg);
+        }
+
+        .accordion.open .accordion-trigger {
+            border-radius: 10px 10px 0 0;
+            border-bottom-color: transparent;
+        }
+
+        .accordion-body {
+            display: none;
+            border: 1px solid var(--border);
+            border-top: none;
+            border-radius: 0 0 10px 10px;
+            padding: 16px;
+            background: var(--bg);
+        }
+        .accordion.open .accordion-body {
+            display: block;
+        }
+
+        .accordion-badge {
+            font-size: 11px;
+            font-weight: 600;
+            padding: 2px 8px;
+            border-radius: 99px;
+            background: rgba(108,99,255,0.15);
+            color: var(--accent);
+        }
+        .accordion-badge.warn {
+            background: rgba(248,113,113,0.15);
+            color: var(--error);
+        }
+
+        /* ── Responsive ─────────────────────────────────────────────────────── */
+        @media (max-width: 900px) {
+            .kanban {
+                flex-direction: column;
+            }
+            .kanban-column {
+                max-width: none;
+            }
+        }
+
+    </style>
+    <script>
+        (function(){
+            var t = null; try { t = localStorage.getItem('timeline-theme'); } catch(e) {}
+            if (t) document.documentElement.setAttribute('data-theme', t);
+        })();
+    </script>
+</head>
+<body>
+
+{% include '_nav.html' %}
+
+<div class="page">
+
+    <!-- Page-specific refresh button -->
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:20px;">
+        <button class="btn btn-refresh" onclick="refreshInsights()">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/>
+                <path d="M21 3v5h-5"/>
+                <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/>
+                <path d="M8 16H3v5"/>
+            </svg>
+            Refresh
+        </button>
+    </div>
+
+    <!-- ── 1. Weekly ticket volume accordion ──────────────────────────────── -->
+    {% if weekly %}
+    <div class="accordion open" id="accordionChart">
+        <button class="accordion-trigger" onclick="toggleAccordion('accordionChart')" aria-expanded="true">
+            <span class="accordion-trigger-left">
+                <span class="accordion-chevron">&#9654;</span>
+                Weekly Helpdesk Volume
+            </span>
+            <span class="accordion-trigger-right">
+                Last 8 weeks
+            </span>
+        </button>
+        <div class="accordion-body">
+            <p style="margin-bottom:12px; font-size:12px; color:var(--text-muted);">Helpdesk board tickets only.</p>
+            <div class="weekly-chart">
+                {% for w in weekly %}
+                <div class="week-col">
+                    <div class="week-bars">
+                        <div class="week-bar helpdesk"
+                             style="height: {{ w.bar_h }}px"
+                             title="{{ w.week_label }}: {{ w.helpdesk }} helpdesk ticket{{ 's' if w.helpdesk != 1 else '' }}"></div>
+                    </div>
+                    <div class="week-label">{{ w.week_label }}</div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- ── 2. Live anomalies accordion ────────────────────────────────────── -->
+    <div class="accordion open" id="accordionAnomalies">
+        <button class="accordion-trigger" onclick="toggleAccordion('accordionAnomalies')" aria-expanded="true">
+            <span class="accordion-trigger-left">
+                <span class="accordion-chevron">&#9654;</span>
+                Live Anomalies
+            </span>
+            <span class="accordion-trigger-right">
+                {% if insights %}
+                <span class="accordion-badge{{ ' warn' if insights|selectattr('severity','equalto','high')|list|length > 0 }}">{{ insights|length }} issue{{ 's' if insights|length != 1 }}</span>
+                {% endif %}
+                <span id="insightsMeta">Auto-refreshes every 30 min</span>
+            </span>
+        </button>
+        <div class="accordion-body">
+            {% if insights %}
+            <div class="filter-bar" id="filterBar">
+                <label>Service</label>
+                <div class="filter-pills" id="servicePills">
+                    <button class="filter-pill active" data-service="all">All</button>
+                </div>
+                <div class="filter-divider"></div>
+                <input type="text" class="filter-search" id="clientSearch" placeholder="Search client..." aria-label="Filter by client name">
+                <span class="filter-count" id="filterCount"></span>
+            </div>
+            <div class="kanban" id="kanbanBoard"></div>
+            {% else %}
+            <div style="text-align:center; padding:24px 0; color:var(--text-muted); font-size:13px;">
+                <p>No anomalies detected right now</p>
+                <p style="font-size:12px; opacity:0.7; margin-top:6px;">Insights appear here when ticket spikes, overdue tickets, quiet clients{% if cipp_enabled %}, unused licences{% endif %}{% if duo_enabled %}, Duo MFA issues{% endif %}{% if huntress_enabled %}, Huntress incidents{% endif %}{% if threatlocker_enabled %}, or ThreatLocker alerts{% endif %} are detected</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- ── 3. Pinned by agent accordion ───────────────────────────────────── -->
+    <div class="accordion open" id="accordionPins">
+        <button class="accordion-trigger" onclick="toggleAccordion('accordionPins')" aria-expanded="true">
+            <span class="accordion-trigger-left">
+                <span class="accordion-chevron">&#9654;</span>
+                Pinned by the Agent
+            </span>
+            <span class="accordion-trigger-right">
+                {% if pins %}
+                <span class="accordion-badge">{{ pins|length }} pin{{ 's' if pins|length != 1 }}</span>
+                {% endif %}
+                <span style="font-size:11px;">Ask the agent to &ldquo;pin this&rdquo;</span>
+            </span>
+        </button>
+        <div class="accordion-body">
+            {% if pins %}
+            <div class="pins-list" id="pinsList">
+                {% for pin in pins %}
+                <div class="pin-card" id="pin-{{ pin.id }}">
+                    <div class="pin-header">
+                        <div style="display:flex; align-items:center; gap:8px;">
+                            <span class="pin-type-badge {{ pin.pin_type or 'finding' }}">{{ pin.pin_type or 'finding' }}</span>
+                            <div class="pin-title">{{ pin.title }}</div>
+                        </div>
+                        <button class="pin-dismiss" onclick="dismissPin({{ pin.id }})">Dismiss</button>
+                    </div>
+                    <div class="pin-summary">{{ pin.summary }}</div>
+                    {% if pin.pin_type == 'query' and pin.results is not none %}
+                        {% if pin.results is string %}
+                        <div class="pin-results-error">{{ pin.results }}</div>
+                        {% elif pin.results %}
+                        <div class="pin-results">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        {% for col in pin.results[0].keys() %}
+                                        <th>{{ col | replace('_', ' ') | title }}</th>
+                                        {% endfor %}
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for row in pin.results %}
+                                    <tr>
+                                        {% for val in row.values() %}
+                                        <td>{{ val }}</td>
+                                        {% endfor %}
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                        {% else %}
+                        <div class="pin-results-empty">No results &mdash; all clear</div>
+                        {% endif %}
+                    {% endif %}
+                    <div class="pin-meta">
+                        <span>Pinned by {{ pin.pinned_by_name }}</span>
+                        <span>{{ pin.created_at[:16].replace('T', ' ') }} UTC</span>
+                    </div>
+                    {% if pin.sql_text %}
+                    <button class="pin-sql-toggle" onclick="togglePinSql(this)">
+                        &#9654; Show SQL
+                    </button>
+                    <div class="pin-sql-content">{{ pin.sql_text }}</div>
+                    {% endif %}
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div style="text-align:center; padding:24px 0; color:var(--text-muted); font-size:13px;">
+                <p>No pinned insights yet</p>
+                <p style="font-size:12px; opacity:0.7; margin-top:6px;">When the agent discovers something notable, ask it to &ldquo;pin this to trends&rdquo; &mdash; it will appear here for the whole team to see</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+</div>
+
+<script>
+    /* ── Accordion toggle ─────────────────────────────────────────────────── */
+    function toggleAccordion(id) {
+        var el = document.getElementById(id);
+        if (!el) return;
+        var isOpen = el.classList.toggle('open');
+        var trigger = el.querySelector('.accordion-trigger');
+        if (trigger) trigger.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+    }
+
+    /* ── Insight data from Jinja (embedded as JSON) ────────────────────────── */
+    var INSIGHTS = {{ insights | tojson | safe if insights else '[]' }};
+
+    /* ── Column definitions ───────────────────────────────────────────────── */
+    var COLUMNS = [
+        {
+            id: 'tickets',
+            title: 'Tickets',
+            color: '#f87171',
+            types: ['ticket_spike', 'overdue', 'stale_priority', 'quiet_client']
+        },
+        {% if duo_enabled %}
+        {
+            id: 'duo',
+            title: 'Duo MFA',
+            color: '#a78bfa',
+            types: ['duo_bypass', 'duo_inactive']
+        },
+        {% endif %}
+        {% if cipp_enabled %}
+        {
+            id: 'm365',
+            title: 'Microsoft 365',
+            color: '#fbbf24',
+            types: ['unused_licenses']
+        },
+        {% endif %}
+        {% if huntress_enabled %}
+        {
+            id: 'huntress',
+            title: 'Huntress EDR',
+            color: '#34d399',
+            types: ['huntress_incidents']
+        },
+        {% endif %}
+        {% if threatlocker_enabled %}
+        {
+            id: 'threatlocker',
+            title: 'ThreatLocker',
+            color: '#60a5fa',
+            types: ['tl_not_lockdown', 'tl_deny_spike']
+        },
+        {% endif %}
+    ];
+
+    /* ── State ────────────────────────────────────────────────────────────── */
+    var activeService = 'all';
+    var clientQuery = '';
+
+    /* ── Build kanban board ───────────────────────────────────────────────── */
+    function buildBoard() {
+        var board = document.getElementById('kanbanBoard');
+        if (!board) return;
+        board.innerHTML = '';
+
+        // Determine which columns have data (after filter)
+        var filtered = getFilteredInsights();
+        var activeColumns = COLUMNS.filter(function (col) {
+            if (activeService !== 'all' && col.id !== activeService) return false;
+            return true;
+        });
+
+        // Single-service mode: expand cards into a full-width grid
+        board.classList.toggle('single-service', activeColumns.length === 1);
+
+        activeColumns.forEach(function (col) {
+            var colInsights = filtered.filter(function (ins) {
+                return col.types.indexOf(ins.type) !== -1;
+            });
+
+            var colEl = document.createElement('div');
+            colEl.className = 'kanban-column';
+            colEl.setAttribute('data-column', col.id);
+
+            // Header
+            var header = document.createElement('div');
+            header.className = 'kanban-column-header';
+            header.innerHTML =
+                '<span class="kanban-column-title">' +
+                    '<span class="kanban-column-dot" style="background:' + col.color + '"></span>' +
+                    col.title +
+                '</span>' +
+                '<span class="kanban-column-count">' + colInsights.length + '</span>';
+            colEl.appendChild(header);
+
+            // Cards container
+            var cardsEl = document.createElement('div');
+            cardsEl.className = 'kanban-column-cards';
+
+            if (colInsights.length === 0) {
+                var emptyEl = document.createElement('div');
+                emptyEl.className = 'kanban-empty';
+                emptyEl.textContent = 'No issues detected';
+                cardsEl.appendChild(emptyEl);
+            } else {
+                colInsights.forEach(function (ins) {
+                    cardsEl.appendChild(buildCard(ins));
+                });
+            }
+
+            colEl.appendChild(cardsEl);
+            board.appendChild(colEl);
+        });
+
+        updateFilterCount(filtered.length);
+    }
+
+    function buildCard(ins) {
+        var card = document.createElement('div');
+        card.className = 'insight-card severity-' + ins.severity;
+        card.setAttribute('data-company', (ins.company || '').toLowerCase());
+        card.setAttribute('data-type', ins.type);
+
+        var TYPE_LABELS = {
+            'ticket_spike': 'Ticket Spike',
+            'overdue_tickets': 'Overdue Tickets',
+            'quiet_client': 'Quiet Client',
+            'high_priority': 'High Priority',
+            'unused_licenses': 'Unused Licences',
+            'duo_bypass': 'MFA Bypass',
+            'huntress_incidents': 'Open Incidents',
+            'tl_not_lockdown': 'Unsecured Endpoints',
+            'tl_deny_spike': 'Deny Spike'
+        };
+        var typeLabel = TYPE_LABELS[ins.type] || ins.type.replace(/_/g, ' ');
+
+        var chipsHtml = '';
+        if (ins.chips && ins.chips.length) {
+            chipsHtml = '<div class="insight-chips">';
+            ins.chips.forEach(function (chip) {
+                chipsHtml += '<a class="insight-chip" href="/?q=' + encodeURIComponent(chip) + '">' + escapeHtml(chip) + '</a>';
+            });
+            chipsHtml += '</div>';
+        }
+
+        card.innerHTML =
+            '<div class="insight-top">' +
+                '<span class="insight-type type-' + ins.type + '">' + typeLabel + '</span>' +
+                '<span class="insight-metric">' + escapeHtml(ins.metric) + '</span>' +
+            '</div>' +
+            '<div class="insight-company">' + escapeHtml(ins.company) + '</div>' +
+            '<div class="insight-detail">' + escapeHtml(ins.detail) + '</div>' +
+            chipsHtml;
+
+        return card;
+    }
+
+    function escapeHtml(str) {
+        if (!str) return '';
+        var d = document.createElement('div');
+        d.textContent = str;
+        return d.innerHTML;
+    }
+
+    /* ── Filtering ────────────────────────────────────────────────────────── */
+    function getFilteredInsights() {
+        return INSIGHTS.filter(function (ins) {
+            // Service filter
+            if (activeService !== 'all') {
+                var col = COLUMNS.find(function (c) { return c.id === activeService; });
+                if (col && col.types.indexOf(ins.type) === -1) return false;
+            }
+            // Client search
+            if (clientQuery) {
+                var name = (ins.company || '').toLowerCase();
+                if (name.indexOf(clientQuery) === -1) return false;
+            }
+            return true;
+        });
+    }
+
+    function updateFilterCount(count) {
+        var el = document.getElementById('filterCount');
+        if (!el) return;
+        var total = INSIGHTS.length;
+        if (activeService === 'all' && !clientQuery) {
+            el.textContent = total + ' anomal' + (total === 1 ? 'y' : 'ies');
+        } else {
+            el.textContent = count + ' of ' + total + ' shown';
+        }
+    }
+
+    /* ── Build service pills ──────────────────────────────────────────────── */
+    function buildServicePills() {
+        var container = document.getElementById('servicePills');
+        if (!container) return;
+
+        // Show all configured columns (even if empty)
+        var activeCols = COLUMNS;
+
+        container.innerHTML = '';
+
+        // "All" pill
+        var allBtn = document.createElement('button');
+        allBtn.className = 'filter-pill active';
+        allBtn.setAttribute('data-service', 'all');
+        allBtn.textContent = 'All';
+        allBtn.onclick = function () { setServiceFilter('all'); };
+        container.appendChild(allBtn);
+
+        activeCols.forEach(function (col) {
+            var btn = document.createElement('button');
+            btn.className = 'filter-pill';
+            btn.setAttribute('data-service', col.id);
+            btn.textContent = col.title;
+            btn.onclick = function () { setServiceFilter(col.id); };
+            container.appendChild(btn);
+        });
+    }
+
+    function setServiceFilter(service) {
+        activeService = service;
+        // Update pill states
+        var pills = document.querySelectorAll('#servicePills .filter-pill');
+        pills.forEach(function (p) {
+            p.classList.toggle('active', p.getAttribute('data-service') === service);
+        });
+        buildBoard();
+    }
+
+    /* ── Client search ───────────────────────────────────────────────────── */
+    var searchInput = document.getElementById('clientSearch');
+    if (searchInput) {
+        var debounceTimer;
+        searchInput.addEventListener('input', function () {
+            clearTimeout(debounceTimer);
+            debounceTimer = setTimeout(function () {
+                clientQuery = searchInput.value.trim().toLowerCase();
+                buildBoard();
+            }, 200);
+        });
+    }
+
+    /* ── Pin actions ──────────────────────────────────────────────────────── */
+    function dismissPin(pinId) {
+        fetch('/api/unpin_trend/' + pinId, { method: 'POST' })
+            .then(function (r) { return r.json(); })
+            .then(function (data) {
+                if (data.ok) {
+                    var el = document.getElementById('pin-' + pinId);
+                    if (el) {
+                        el.style.opacity = '0';
+                        el.style.transition = 'opacity 0.3s';
+                        setTimeout(function () { el.remove(); }, 300);
+                    }
+                }
+            })
+            .catch(function () {});
+    }
+
+    function togglePinSql(btn) {
+        var content = btn.nextElementSibling;
+        var open = content.classList.toggle('visible');
+        btn.innerHTML = (open ? '&#9660;' : '&#9654;') + ' Show SQL';
+    }
+
+    function refreshInsights() {
+        document.getElementById('insightsMeta').textContent = 'Refreshing…';
+        fetch('/api/insights?refresh=1')
+            .then(function (r) { return r.json(); })
+            .then(function (data) {
+                if (data.insights) {
+                    INSIGHTS = data.insights;
+                    buildServicePills();
+                    buildBoard();
+                }
+                document.getElementById('insightsMeta').textContent = 'Refreshed just now';
+            })
+            .catch(function () {
+                document.getElementById('insightsMeta').textContent = 'Refresh failed — try again';
+            });
+    }
+
+    /* If page was opened with ?q= from an insight chip, redirect to chat */
+    var params = new URLSearchParams(window.location.search);
+    var q = params.get('q');
+    if (q) {
+        window.location.href = '/?q=' + encodeURIComponent(q);
+    }
+
+    /* ── Init ─────────────────────────────────────────────────────────────── */
+    buildServicePills();
+    buildBoard();
+
+</script>
+</body>
+</html>

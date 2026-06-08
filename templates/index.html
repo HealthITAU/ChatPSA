@@ -1,0 +1,1678 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ app_name }}</title>
+    <link rel="icon" type="image/x-icon" href="/static/favicon.ico">
+    <link rel="icon" type="image/png" sizes="32x32" href="/static/favicon-32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="/static/favicon-16.png">
+    <link rel="apple-touch-icon" sizes="180x180" href="/static/apple-touch-icon.png">
+    <style>
+        /* ── Design tokens ─────────────────────────────────────────────────── */
+        :root, [data-theme="dark"] {
+            --bg:             #0f1117;
+            --surface:        #1a1d27;
+            --surface-hover:  #242736;
+            --border:         #2e3142;
+            --text:           #e1e4ed;
+            --text-muted:     #8b8fa3;
+            --accent:         #6c63ff;
+            --accent-hover:   #5a52d5;
+            --user-bubble:    #2a2d4a;
+            --bot-bubble:     #1e2133;
+            --success:        #34d399;
+            --warning:        #fbbf24;
+            --error:          #f87171;
+            --code-bg:        #151822;
+        }
+        [data-theme="light"] {
+            --bg:             #f5f6f8;
+            --surface:        #ffffff;
+            --surface-hover:  #f0f1f4;
+            --border:         #dcdee4;
+            --text:           #1a1d27;
+            --text-muted:     #6b7084;
+            --accent:         #5b52e0;
+            --accent-hover:   #4a43c0;
+            --user-bubble:    #e8e6ff;
+            --bot-bubble:     #f0f1f4;
+            --success:        #16a369;
+            --warning:        #d97706;
+            --error:          #dc2626;
+            --code-bg:        #f0f1f4;
+        }
+
+        /* ── Reset ──────────────────────────────────────────────────────────── */
+        *, *::before, *::after {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        /* ── Base ───────────────────────────────────────────────────────────── */
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+                         "Helvetica Neue", Arial, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .welcome-brand {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+        }
+        .welcome-brand img { height: 48px; width: 48px; object-fit: contain; }
+        .welcome-brand .brand-name {
+            font-size: 32px;
+            font-weight: 700;
+            color: var(--text);
+            letter-spacing: -0.5px;
+        }
+
+        /* ── Shared button ───────────────────────────────────────────────────── */
+        .btn {
+            padding: 6px 14px;
+            border-radius: 6px;
+            border: 1px solid var(--border);
+            background: var(--surface);
+            color: var(--text-muted);
+            font-size: 13px;
+            font-family: inherit;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+        .btn:hover { background: var(--surface-hover); color: var(--text); }
+        .btn:focus-visible {
+            outline: none;
+            box-shadow: 0 0 0 2px var(--accent);
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            display: inline-block;
+            margin-right: 4px;
+        }
+        .status-dot.ok    { background: var(--success); }
+        .status-dot.warn  { background: var(--warning); }
+        .status-dot.error { background: var(--error); }
+
+        /* ── Chat area ───────────────────────────────────────────────────────── */
+        .chat-container {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .message {
+            max-width: 80%;
+            padding: 12px 16px;
+            border-radius: 12px;
+            line-height: 1.6;
+            font-size: 14px;
+            animation: fadeIn 0.2s ease;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(8px); }
+            to   { opacity: 1; transform: translateY(0); }
+        }
+
+        .message.user {
+            align-self: flex-end;
+            background: var(--user-bubble);
+            border-bottom-right-radius: 4px;
+        }
+
+        .message.assistant {
+            align-self: flex-start;
+            background: var(--bot-bubble);
+            border: 1px solid var(--border);
+            border-bottom-left-radius: 4px;
+        }
+
+        .message.system {
+            align-self: center;
+            background: transparent;
+            color: var(--text-muted);
+            font-size: 13px;
+            text-align: center;
+            padding: 8px;
+        }
+
+        .message p { margin-bottom: 8px; }
+        .message p:last-child { margin-bottom: 0; }
+        .message strong { color: var(--accent); font-weight: 600; }
+        .message ul, .message ol { margin: 8px 0; padding-left: 20px; }
+        .message li { margin: 4px 0; }
+
+        .message table {
+            border-collapse: collapse;
+            width: 100%;
+            margin: 8px 0;
+            font-size: 13px;
+        }
+        .message th, .message td {
+            padding: 6px 10px;
+            text-align: left;
+            border: 1px solid var(--border);
+        }
+        .message th {
+            background: var(--surface);
+            font-weight: 600;
+            color: var(--accent);
+        }
+
+        .message code {
+            background: var(--code-bg);
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 13px;
+            font-family: "SF Mono", "Fira Code", Consolas, monospace;
+        }
+        .message pre {
+            background: var(--code-bg);
+            padding: 12px;
+            border-radius: 8px;
+            overflow-x: auto;
+            margin: 8px 0;
+        }
+        .message pre code { background: none; padding: 0; }
+
+        /* ── SQL detail toggle ───────────────────────────────────────────────── */
+        .sql-detail { margin-top: 8px; }
+
+        .sql-toggle {
+            background: none;
+            border: none;
+            color: var(--text-muted);
+            font-size: 12px;
+            font-family: inherit;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 4px 0;
+        }
+        .sql-toggle:hover { color: var(--text); }
+        .sql-toggle:focus-visible {
+            outline: none;
+            color: var(--text);
+        }
+
+        .sql-content { display: none; margin-top: 4px; }
+        .sql-content.visible { display: block; }
+        .sql-query-block { margin-bottom: 2px; }
+        .sql-query-block:last-child { margin-bottom: 0; }
+
+        /* ── Feedback buttons ───────────────────────────────────────────────── */
+        .feedback-row {
+            display: flex;
+            gap: 4px;
+            margin-top: 6px;
+            align-items: center;
+        }
+        .feedback-btn {
+            background: none;
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            color: var(--text-muted);
+            cursor: pointer;
+            padding: 3px 6px;
+            display: inline-flex;
+            align-items: center;
+            transition: color 0.15s, border-color 0.15s, background 0.15s;
+        }
+        .feedback-btn:hover {
+            color: var(--text);
+            border-color: var(--text-muted);
+        }
+        .feedback-btn:disabled {
+            cursor: default;
+            opacity: 0.5;
+        }
+        .feedback-label {
+            font-size: 12px;
+            color: var(--text-muted);
+            margin-right: 4px;
+            white-space: nowrap;
+            transition: opacity 0.3s, width 0.3s;
+        }
+        .feedback-label-hidden {
+            opacity: 0;
+            width: 0;
+            overflow: hidden;
+            margin: 0;
+        }
+        .feedback-sent .feedback-btn { border-color: transparent; }
+        .feedback-sent-up .feedback-up {
+            color: #4caf50;
+            opacity: 1;
+            border-color: #4caf50;
+        }
+        .feedback-sent-down .feedback-down {
+            color: #e57373;
+            opacity: 1;
+            border-color: #e57373;
+        }
+
+        /* ── Toast notification ─────────────────────────────────────────────── */
+        .toast-container {
+            position: fixed;
+            bottom: 80px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 1000;
+            pointer-events: none;
+        }
+        .toast {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 8px 16px;
+            font-size: 13px;
+            color: var(--text);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            opacity: 0;
+            transform: translateY(10px);
+            animation: toast-in 0.25s ease forwards, toast-out 0.25s ease 2.5s forwards;
+        }
+        @keyframes toast-in {
+            to { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes toast-out {
+            to { opacity: 0; transform: translateY(-10px); }
+        }
+
+        /* ── Verified query indicator ───────────────────────────────────────── */
+        .verified-tag {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            font-size: 11px;
+            color: var(--text-muted);
+            margin-top: 4px;
+        }
+        .verified-tag svg {
+            color: #4caf50;
+        }
+
+        /* ── Typing indicator ────────────────────────────────────────────────── */
+        .typing {
+            display: flex;
+            gap: 4px;
+            padding: 12px 16px;
+            align-self: flex-start;
+        }
+        .typing span {
+            width: 8px;
+            height: 8px;
+            background: var(--text-muted);
+            border-radius: 50%;
+            animation: bounce 1.4s infinite;
+        }
+        .typing span:nth-child(2) { animation-delay: 0.2s; }
+        .typing span:nth-child(3) { animation-delay: 0.4s; }
+        .typing .typing-label {
+            width: auto;
+            height: auto;
+            background: none;
+            border-radius: 0;
+            animation: none;
+            color: var(--text-muted);
+            font-size: 12px;
+            margin-left: 4px;
+            white-space: nowrap;
+        }
+
+        @keyframes bounce {
+            0%, 60%, 100% { transform: translateY(0); }
+            30%            { transform: translateY(-8px); }
+        }
+
+        /* ── Input area ──────────────────────────────────────────────────────── */
+        .input-area {
+            padding: 16px 20px;
+            background: var(--surface);
+            border-top: 1px solid var(--border);
+            flex-shrink: 0;
+        }
+
+        .input-row {
+            display: flex;
+            gap: 8px;
+            max-width: 900px;
+            margin: 0 auto;
+        }
+
+        #messageInput {
+            flex: 1;
+            padding: 10px 16px;
+            border-radius: 10px;
+            border: 1px solid var(--border);
+            background: var(--bg);
+            color: var(--text);
+            font-size: 14px;
+            font-family: inherit;
+            resize: none;
+            min-height: 42px;
+            max-height: 120px;
+        }
+        #messageInput:focus {
+            outline: none;
+            border-color: var(--accent);
+        }
+        #messageInput::placeholder { color: var(--text-muted); }
+
+        #sendBtn {
+            padding: 10px 20px;
+            border-radius: 10px;
+            border: none;
+            background: var(--accent);
+            color: white;
+            font-size: 14px;
+            font-weight: 500;
+            font-family: inherit;
+            cursor: pointer;
+            transition: background 0.15s;
+            white-space: nowrap;
+        }
+        #sendBtn:hover { background: var(--accent-hover); }
+        #sendBtn:disabled { opacity: 0.5; cursor: not-allowed; }
+        #sendBtn:focus-visible {
+            outline: none;
+            box-shadow: 0 0 0 2px var(--accent-hover);
+        }
+
+        /* ── Live insight chip section ───────────────────────────────────────── */
+        .insight-chip-section {
+            margin-bottom: 4px;
+            width: 100%;
+        }
+        /* Anomaly chips — warm amber tint to signal live/actionable data */
+        #insightChipContainer .suggestion {
+            border-color: rgba(251,191,36,0.35);
+            color: #fbbf24;
+            background: rgba(251,191,36,0.07);
+        }
+        #insightChipContainer .suggestion:hover {
+            border-color: #fbbf24;
+            background: rgba(251,191,36,0.15);
+            color: #fde68a;
+        }
+
+        /* ── Suggestion chips ────────────────────────────────────────────────── */
+        .suggestions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            justify-content: center;
+            margin-top: 4px;
+            transition: opacity 0.4s ease;
+        }
+        .suggestions.fading { opacity: 0; }
+
+        /* Suggestion chips are <button> elements — reset then restyle */
+        .suggestion {
+            padding: 8px 14px;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+            background: var(--surface);
+            color: var(--text-muted);
+            font-size: 13px;
+            font-family: inherit;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+        .suggestion:hover {
+            background: var(--surface-hover);
+            color: var(--text);
+            border-color: var(--accent);
+        }
+        .suggestion:focus-visible {
+            outline: none;
+            box-shadow: 0 0 0 2px var(--accent);
+        }
+
+        /* ── Welcome screen ──────────────────────────────────────────────────── */
+        .welcome {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            flex: 1;
+            gap: 16px;
+            text-align: center;
+            padding: 40px 20px;
+        }
+        .welcome h2 { font-size: 22px; font-weight: 600; }
+        .welcome p  { color: var(--text-muted); max-width: 500px; line-height: 1.6; }
+
+        /* ── Responsive ──────────────────────────────────────────────────────── */
+        @media (max-width: 768px) {
+            .message { max-width: 95%; }
+        }
+
+        /* ── Memory bar (persistent banner below header) ──────────────────── */
+        .memory-bar {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 6px 20px;
+            background: var(--surface);
+            border-bottom: 1px solid var(--border);
+            min-height: 34px;
+            flex-shrink: 0;
+        }
+
+        .memory-bar-label {
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            white-space: nowrap;
+            flex-shrink: 0;
+        }
+
+        /* scrollable chip row */
+        .memory-bar-chips {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            overflow-x: auto;
+            flex: 1;
+            scrollbar-width: none;
+        }
+        .memory-bar-chips::-webkit-scrollbar { display: none; }
+
+        .memory-bar-empty {
+            font-size: 11px;
+            color: var(--text-muted);
+            font-style: italic;
+        }
+
+        /* individual memory chip */
+        .memory-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 2px 8px 2px 10px;
+            font-size: 11px;
+            color: var(--text);
+            white-space: nowrap;
+            flex-shrink: 0;
+            max-width: 260px;
+        }
+
+        .memory-chip-text {
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .memory-chip-del {
+            background: none;
+            border: none;
+            cursor: pointer;
+            color: var(--text-muted);
+            font-size: 12px;
+            line-height: 1;
+            padding: 0 2px;
+            border-radius: 50%;
+            flex-shrink: 0;
+            transition: color 0.15s;
+        }
+        .memory-chip-del:hover { color: #e57373; }
+
+        /* confirming-delete state */
+        .memory-chip.confirming {
+            border-color: #e57373;
+            background: rgba(229,115,115,0.08);
+        }
+        .memory-chip-confirm-text {
+            font-size: 10px;
+            color: #e57373;
+        }
+        .memory-chip-confirm-yes, .memory-chip-confirm-no {
+            background: none;
+            border: 1px solid currentColor;
+            border-radius: 4px;
+            font-size: 10px;
+            padding: 0 5px;
+            cursor: pointer;
+            line-height: 1.4;
+        }
+        .memory-chip-confirm-yes { color: #e57373; }
+        .memory-chip-confirm-no  { color: var(--text-muted); }
+
+        /* slots on the right */
+        .memory-bar-slots {
+            display: flex;
+            gap: 4px;
+            align-items: center;
+            flex-shrink: 0;
+            margin-left: auto;
+        }
+
+        .memory-panel-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 10px;
+        }
+
+        .memory-panel-title {
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+        }
+
+        .memory-slots {
+            display: flex;
+            gap: 4px;
+            align-items: center;
+        }
+
+        .memory-slot {
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+            border: 1.5px solid var(--border);
+            background: transparent;
+            transition: background 0.2s, border-color 0.2s;
+        }
+
+        .memory-slot.used {
+            background: var(--accent, #6366f1);
+            border-color: var(--accent, #6366f1);
+        }
+
+        .memory-slot.used.last {
+            background: #f59e0b;
+            border-color: #f59e0b;
+        }
+
+        .memory-slots.full .memory-slot.used {
+            background: #e57373;
+            border-color: #e57373;
+        }
+
+        .memory-limit-warning {
+            display: none;
+            font-size: 10px;
+            color: #e57373;
+            background: rgba(229, 115, 115, 0.08);
+            border: 1px solid rgba(229, 115, 115, 0.25);
+            border-radius: 5px;
+            padding: 4px 8px;
+            margin-bottom: 8px;
+            text-align: center;
+        }
+
+        .memory-empty {
+            font-size: 11px;
+            color: var(--text-muted);
+            font-style: italic;
+            text-align: center;
+            padding: 4px 0 2px;
+        }
+
+        /* ── Pending memory approval ─────────────────────────────────────── */
+        .pending-memories {
+            align-self: flex-start;
+            max-width: 80%;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            animation: fadeIn 0.2s ease;
+        }
+
+        .pending-memory-card {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            background: var(--bot-bubble);
+            border: 1px solid rgba(108, 99, 255, 0.3);
+            border-radius: 10px;
+            padding: 10px 14px;
+            font-size: 13px;
+        }
+
+        .pending-memory-icon {
+            flex-shrink: 0;
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            background: rgba(108, 99, 255, 0.12);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--accent);
+            font-size: 14px;
+        }
+
+        .pending-memory-body {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .pending-memory-label {
+            font-size: 11px;
+            color: var(--text-muted);
+            margin-bottom: 2px;
+        }
+
+        .pending-memory-value {
+            color: var(--text);
+            font-size: 13px;
+            line-height: 1.4;
+        }
+
+        .pending-memory-value strong {
+            color: var(--accent);
+            font-weight: 600;
+        }
+
+        .pending-memory-actions {
+            display: flex;
+            gap: 6px;
+            flex-shrink: 0;
+        }
+
+        .pending-memory-actions button {
+            padding: 4px 12px;
+            border-radius: 6px;
+            border: 1px solid var(--border);
+            background: var(--surface);
+            color: var(--text-muted);
+            font-size: 12px;
+            font-family: inherit;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+
+        .pending-memory-actions button:hover {
+            color: var(--text);
+            background: var(--surface-hover);
+        }
+
+        .pending-memory-actions .approve-btn {
+            border-color: rgba(52, 211, 153, 0.4);
+            color: var(--success);
+        }
+
+        .pending-memory-actions .approve-btn:hover {
+            background: rgba(52, 211, 153, 0.1);
+            border-color: var(--success);
+        }
+
+        .pending-memory-card.approved {
+            border-color: rgba(52, 211, 153, 0.3);
+            opacity: 0.6;
+        }
+
+        .pending-memory-card.dismissed {
+            border-color: var(--border);
+            opacity: 0.4;
+        }
+
+        .memory-item {
+            display: grid;
+            grid-template-columns: 1fr auto;
+            align-items: start;
+            gap: 6px;
+            padding: 6px 0;
+            border-top: 1px solid var(--border);
+        }
+
+        .memory-item:first-of-type { border-top: none; }
+
+        .memory-item-body {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+            min-width: 0;
+        }
+
+        .memory-item-key {
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--text);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .memory-item-value {
+            font-size: 11px;
+            color: var(--text-muted);
+            line-height: 1.4;
+            display: -webkit-box;
+            -webkit-line-clamp: 3;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+
+        .memory-delete-btn {
+            background: none;
+            border: none;
+            cursor: pointer;
+            color: var(--text-muted);
+            padding: 2px 4px;
+            border-radius: 4px;
+            font-size: 13px;
+            line-height: 1;
+            flex-shrink: 0;
+            transition: color 0.15s, background 0.15s;
+        }
+
+        .memory-delete-btn:hover {
+            color: #e57373;
+            background: rgba(229, 115, 115, 0.1);
+        }
+
+        .memory-delete-confirm {
+            font-size: 10px;
+            color: #e57373;
+            display: flex;
+            gap: 6px;
+            align-items: center;
+            margin-top: 3px;
+        }
+
+        .memory-delete-confirm button {
+            background: none;
+            border: 1px solid currentColor;
+            border-radius: 4px;
+            color: inherit;
+            font-size: 10px;
+            padding: 1px 6px;
+            cursor: pointer;
+        }
+
+        .memory-delete-confirm button.cancel {
+            color: var(--text-muted);
+            border-color: var(--border);
+        }
+    </style>
+    <script>
+        (function(){
+            var t = null; try { t = localStorage.getItem('timeline-theme'); } catch(e) {}
+            if (t) document.documentElement.setAttribute('data-theme', t);
+        })();
+    </script>
+</head>
+<body>
+
+{% include '_nav.html' %}
+
+<!-- ── Memory bar ───────────────────────────────────────────────────────── -->
+<div class="memory-bar" id="memoryBar">
+    <span class="memory-bar-label"
+          data-tooltip="Ask the agent to 'remember' something to store it here">Context</span>
+    <div class="memory-bar-chips" id="memoryBarChips">
+        <span class="memory-bar-empty">Nothing remembered yet.</span>
+    </div>
+    <div class="memory-slots memory-bar-slots" id="memorySlots">
+        <div class="memory-slot" data-slot="1"></div>
+        <div class="memory-slot" data-slot="2"></div>
+        <div class="memory-slot" data-slot="3"></div>
+        <div class="memory-slot" data-slot="4"></div>
+        <div class="memory-slot" data-slot="5"></div>
+    </div>
+</div>
+
+<main class="chat-container" id="chatContainer">
+    <div class="welcome" id="welcome">
+        <div class="welcome-brand"><img src="/static/icon.png" alt="Logo"><span class="brand-name">{{ app_name }}</span></div>
+        <h2>Ask anything about your service data</h2>
+        <p id="welcomeDesc">I can query ConnectWise tickets, time entries, and agreements. Ask me in plain English.</p>
+        <!-- Live anomaly chips — hidden until populated from /api/insights -->
+        <div class="insight-chip-section" id="insightChipSection" style="display:none;">
+            <div class="suggestions" id="insightChipContainer" role="list" aria-label="Live insights"></div>
+        </div>
+        <!-- Generic suggestion chips — always shown -->
+        <div class="suggestions" id="suggestionContainer" role="list" aria-label="Suggested questions"></div>
+    </div>
+</main>
+
+<div class="input-area">
+    <div class="input-row">
+        <textarea id="messageInput"
+                  placeholder="Ask about your ConnectWise data…"
+                  rows="1"
+                  aria-label="Message input"
+                  onkeydown="handleKeydown(event)"
+                  oninput="autoResize(this)"></textarea>
+        <button id="sendBtn" onclick="sendMessage()">Send</button>
+        <button class="btn" onclick="clearChat()" title="Clear chat and start over">New Chat</button>
+    </div>
+</div>
+
+<div class="toast-container" id="toastContainer"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.1.6/purify.min.js"></script>
+<script>
+    // ── DOM refs ──────────────────────────────────────────────────────────────
+    const chatContainer  = document.getElementById('chatContainer');
+    const messageInput   = document.getElementById('messageInput');
+    const sendBtn        = document.getElementById('sendBtn');
+    const welcome        = document.getElementById('welcome');
+
+    const sessionId = 'session_' + Date.now();
+    let isWaiting = false;
+    let hasVotedThisSession = false;
+    let querySource = 'typed';
+
+    // ── Toast notifications ──────────────────────────────────────────────────
+    function showToast(message) {
+        const container = document.getElementById('toastContainer');
+        const toast = document.createElement('div');
+        toast.className = 'toast';
+        toast.textContent = message;
+        container.appendChild(toast);
+        setTimeout(function () { toast.remove(); }, 3000);
+    }
+
+    // ── Suggestion pools ──────────────────────────────────────────────────────
+    // Operational — always shown, no external service dependency
+    const SUGGESTION_POOL_OPERATIONAL = [
+        "What high-priority tickets have been open for more than 48 hours?",
+        "Which technicians logged the most billable hours this week vs last week?",
+        "Which clients have the most tickets that are still waiting on us?",
+        "Show me overdue tickets grouped by board and priority",
+        "What agreements are expiring in the next 30 days?",
+        "Which technicians have unassigned time entries from this week?",
+        "What did we work on yesterday, broken down by client?",
+        "Which boards have the highest average ticket age right now?",
+        "Show me tickets opened today that don't have a technician assigned yet",
+        "Which clients have active agreements but zero tickets in the last 90 days?",
+    ];
+
+    // Analytics — always shown, pure CW data, no external service dependency
+    const SUGGESTION_POOL_ANALYTICS = [
+        "Which clients' ticket volumes have grown the most over the last 90 days?",
+        "What is our average ticket resolution time by board this quarter?",
+        "Show me monthly ticket volume for the last 6 months broken down by board",
+        "Which service types take the longest to resolve on average?",
+        "Which technicians have the highest average tickets closed per week this month?",
+        "Show me billable vs non-billable hours per technician for the last 30 days",
+        "What percentage of tickets are resolved within SLA this month?",
+        "Which clients generate the most after-hours tickets?",
+    ];
+
+    // Service-gated chips — only added when that service has data in customer_map
+    const SUGGESTION_POOL_SERVICES = {
+        cipp: [
+            "Do clients with more paid M365 licences (E3, E5, F3, Business Basic/Standard/Premium) submit more tickets?",
+            "Which clients have M365 alerts that haven't been addressed?",
+            "Show me clients ranked by total paid M365 licence count",
+            "Are there any clients with low M365 licence availability who also have open tickets?",
+            "Which clients have the most unused M365 licences?",
+            "Which clients are set up in ConnectWise but missing from CIPP?",
+        ],
+        duo: [
+            "Show me clients that have Duo enabled — do they submit fewer security-related tickets?",
+        ],
+        huntress: [
+            "Which clients have Huntress deployed and how many endpoint-related tickets do they have?",
+        ],
+        cove: [
+            "Which clients have Cove backup enabled?",
+            "Which clients have active agreements but no Cove backup?",
+        ],
+        automate: [
+            "Which clients are in ConnectWise Automate but not in Manage?",
+        ],
+    };
+
+    // Operational pool is built dynamically (service chips appended when active)
+    let SUGGESTION_POOL = [...SUGGESTION_POOL_OPERATIONAL];
+
+    function buildSuggestionPool(services) {
+        SUGGESTION_POOL = [...SUGGESTION_POOL_OPERATIONAL];
+        for (const [svc, chips] of Object.entries(SUGGESTION_POOL_SERVICES)) {
+            if (services && services[svc]) {
+                SUGGESTION_POOL.push(...chips);
+            }
+        }
+    }
+
+    function renderAnalytics(containerId) {
+        const container = document.getElementById(containerId);
+        if (!container) return;
+        const picked = [...SUGGESTION_POOL_ANALYTICS].sort(() => Math.random() - 0.5).slice(0, 4);
+        container.innerHTML = '';
+        picked.forEach(s => {
+            const btn = document.createElement('button');
+            btn.className = 'suggestion';
+            btn.setAttribute('role', 'listitem');
+            btn.textContent = s;
+            btn.addEventListener('click', function () { askSuggestion(s); });
+            container.appendChild(btn);
+        });
+    }
+
+    // Update the welcome screen description to only mention active services
+    function updateWelcomeDescription(services) {
+        const el = document.getElementById('welcomeDesc');
+        if (!el) return;
+        const extras = [];
+        if (services.cipp)      extras.push('M365 licences via CIPP');
+        if (services.huntress)  extras.push('Huntress endpoint security');
+        if (services.duo)       extras.push('Duo MFA');
+        if (services.cove)      extras.push('Cove backup status');
+        if (services.automate)  extras.push('ConnectWise Automate');
+        let desc = 'I can query ConnectWise tickets, time entries, and agreements';
+        if (extras.length === 1) {
+            desc += ' — as well as ' + extras[0];
+        } else if (extras.length > 1) {
+            desc += ' — as well as ' + extras.slice(0, -1).join(', ') + ', and ' + extras[extras.length - 1];
+        }
+        desc += '. Ask me in plain English.';
+        el.textContent = desc;
+    }
+
+    let suggestionCycleTimer = null;
+
+    // ── Insight chip cycling ──────────────────────────────────────────────────
+    let allInsightChips = [];
+    let insightChipOffset = 0;
+    let insightChipCycleTimer = null;
+
+    function renderInsightChips() {
+        const container = document.getElementById('insightChipContainer');
+        const section   = document.getElementById('insightChipSection');
+        if (!container || !allInsightChips.length) return;
+        container.innerHTML = '';
+        const slice = allInsightChips.slice(insightChipOffset, insightChipOffset + 4);
+        slice.forEach(function (chip) {
+            const text = (chip && chip.text) ? chip.text : chip;
+            const ctx  = (chip && chip.context) ? chip.context : null;
+            const btn  = document.createElement('button');
+            btn.className = 'suggestion';
+            btn.setAttribute('role', 'listitem');
+            btn.textContent = text;
+            if (ctx) btn.dataset.anomalyContext = ctx;
+            btn.addEventListener('click', function () { askSuggestion(text, ctx); });
+            container.appendChild(btn);
+        });
+        section.style.display = '';
+    }
+
+    function cycleInsightChips() {
+        const container = document.getElementById('insightChipContainer');
+        if (!container || allInsightChips.length <= 4) { insightChipCycleTimer = null; return; }
+        container.classList.add('fading');
+        setTimeout(function () {
+            insightChipOffset = (insightChipOffset + 4) % allInsightChips.length;
+            renderInsightChips();
+            container.classList.remove('fading');
+        }, 400);
+        insightChipCycleTimer = setTimeout(cycleInsightChips, (25 + Math.random() * 35) * 1000);
+    }
+
+    function startInsightChipCycle() {
+        clearTimeout(insightChipCycleTimer);
+        insightChipOffset = 0;
+        renderInsightChips();
+        if (allInsightChips.length > 4) {
+            insightChipCycleTimer = setTimeout(cycleInsightChips, (25 + Math.random() * 35) * 1000);
+        }
+    }
+
+    function renderSuggestions(containerId) {
+        const container = document.getElementById(containerId);
+        if (!container) return;
+        const picked = [...SUGGESTION_POOL].sort(() => Math.random() - 0.5).slice(0, 4);
+        container.innerHTML = '';
+        picked.forEach(s => {
+            const btn = document.createElement('button');
+            btn.className = 'suggestion';
+            btn.setAttribute('role', 'listitem');
+            btn.textContent = s;
+            btn.addEventListener('click', () => askSuggestion(s));
+            container.appendChild(btn);
+        });
+    }
+
+    function cycleSuggestions() {
+        const container = document.getElementById('suggestionContainer');
+        if (!container) { clearTimeout(suggestionCycleTimer); suggestionCycleTimer = null; return; }
+        container.classList.add('fading');
+        setTimeout(() => {
+            renderSuggestions('suggestionContainer');
+            container.classList.remove('fading');
+        }, 400);
+        suggestionCycleTimer = setTimeout(cycleSuggestions, (20 + Math.random() * 40) * 1000);
+    }
+
+    function startSuggestionCycle() {
+        clearTimeout(suggestionCycleTimer);
+        renderSuggestions('suggestionContainer');
+        suggestionCycleTimer = setTimeout(cycleSuggestions, (20 + Math.random() * 40) * 1000);
+    }
+
+    function stopSuggestionCycle() {
+        clearTimeout(suggestionCycleTimer);
+        suggestionCycleTimer = null;
+    }
+
+    startSuggestionCycle();
+
+    // ── Live insight chips ────────────────────────────────────────────────────
+    // Fetched once on load from /api/insights. Shown in a separate labelled row
+    // above the standard suggestion pool, only when at least one insight exists.
+    async function loadInsightChips() {
+        try {
+            const resp = await fetch('/api/insights');
+            if (!resp.ok) return;
+            const data = await resp.json();
+
+            // Update suggestion pool and welcome description based on which services are live
+            if (data.services) {
+                buildSuggestionPool(data.services);
+                renderSuggestions('suggestionContainer');
+                updateWelcomeDescription(data.services);
+            }
+
+            // Populate live insight chips — store all and start cycling
+            const chips = data.chips || [];
+            if (!chips.length) return;
+            allInsightChips = chips;
+            startInsightChipCycle();
+        } catch (_) { /* silently ignore — not critical */ }
+    }
+    loadInsightChips();
+
+    // Handle ?q= redirect from trends page
+    (function () {
+        const params = new URLSearchParams(window.location.search);
+        const q = params.get('q');
+        if (q) {
+            history.replaceState({}, '', '/');
+            messageInput.value = q;
+            sendMessage();
+        }
+    })();
+
+    // ── Status poller ────────────────────────────────────────────────────────
+    // Polls /api/status for health check and refreshes memories.
+    let pollTimer = null;
+
+    async function poll() {
+        clearTimeout(pollTimer);
+        try {
+            await fetch('/api/status');
+            loadMemories();
+        } catch (_) {}
+        pollTimer = setTimeout(poll, 30000);
+    }
+
+    function startPoller() { clearTimeout(pollTimer); poll(); }
+
+    startPoller();
+
+    // ── Chat helpers ──────────────────────────────────────────────────────────
+    function fmtDate(iso) {
+        if (!iso) return null;
+        return new Date(iso).toLocaleString(undefined, {
+            month: 'short', day: 'numeric',
+            hour: 'numeric', minute: '2-digit',
+        });
+    }
+
+    function handleKeydown(e) {
+        if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
+    }
+
+    function autoResize(el) {
+        el.style.height = 'auto';
+        el.style.height = Math.min(el.scrollHeight, 120) + 'px';
+    }
+
+    function askSuggestion(text, anomalyContext) {
+        querySource = 'suggested';
+        messageInput.value = text;
+        sendMessage(anomalyContext || null);
+    }
+
+    function addMessage(role, content, sql, queries, question, examplesUsed, errorDetail) {
+        const w = document.getElementById('welcome');
+        if (w) w.style.display = 'none';
+
+        const div = document.createElement('div');
+        div.className = 'message ' + role;
+
+        if (role === 'assistant') {
+            div.innerHTML = DOMPurify.sanitize(renderMarkdown(content));
+
+            /* ── Error detail dropdown ─────────────────────────────────────── */
+            if (errorDetail) {
+                const detail = document.createElement('div');
+                detail.className = 'sql-detail';
+                const toggle = document.createElement('button');
+                toggle.className = 'sql-toggle';
+                toggle.setAttribute('aria-expanded', 'false');
+                toggle.textContent = '▶ Show error details';
+                toggle.addEventListener('click', function () {
+                    const errContent = this.nextElementSibling;
+                    const open = errContent.classList.toggle('visible');
+                    this.setAttribute('aria-expanded', String(open));
+                    this.textContent = (open ? '▼' : '▶') + ' Show error details';
+                });
+                const pre = document.createElement('div');
+                pre.className = 'sql-content';
+                pre.innerHTML = '<pre><code>' + escapeHtml(errorDetail) + '</code></pre>';
+                detail.appendChild(toggle);
+                detail.appendChild(pre);
+                div.appendChild(detail);
+            }
+
+            /* ── Multi-query dropdown (preferred) or single-SQL fallback ──── */
+            const qList = Array.isArray(queries) ? queries.filter(q => q.sql) : [];
+            /* Determine the "primary" SQL for feedback — the last successful query */
+            const primarySql = qList.length ? qList[qList.length - 1].sql
+                             : (sql || null);
+
+            if (qList.length > 1) {
+                /* Multiple queries — show numbered toggles */
+                const detail = document.createElement('div');
+                detail.className = 'sql-detail';
+                qList.forEach(function (q, idx) {
+                    const wrap = document.createElement('div');
+                    wrap.className = 'sql-query-block';
+                    const toggle = document.createElement('button');
+                    toggle.className = 'sql-toggle';
+                    toggle.setAttribute('aria-expanded', 'false');
+                    const label = 'Query ' + (idx + 1) + ' of ' + qList.length;
+                    const rows  = q.error ? ' — error' : ' — ' + (q.row_count || 0) + ' rows';
+                    toggle.textContent = '▶ ' + label + rows;
+                    toggle.addEventListener('click', function () {
+                        const sqlContent = this.nextElementSibling;
+                        const open = sqlContent.classList.toggle('visible');
+                        this.setAttribute('aria-expanded', String(open));
+                        this.textContent = (open ? '▼' : '▶') + ' ' + label + rows;
+                    });
+                    const pre = document.createElement('div');
+                    pre.className = 'sql-content';
+                    pre.innerHTML = '<pre><code>' + escapeHtml(q.sql) + '</code></pre>';
+                    wrap.appendChild(toggle);
+                    wrap.appendChild(pre);
+                    detail.appendChild(wrap);
+                });
+                div.appendChild(detail);
+            } else if (qList.length === 1) {
+                /* Single query from queries array */
+                const q = qList[0];
+                const detail = document.createElement('div');
+                detail.className = 'sql-detail';
+                const toggle = document.createElement('button');
+                toggle.className = 'sql-toggle';
+                toggle.setAttribute('aria-expanded', 'false');
+                const rows = q.error ? ' — error' : ' — ' + (q.row_count || 0) + ' rows';
+                toggle.textContent = '▶ Show SQL query' + rows;
+                toggle.addEventListener('click', function () {
+                    const sqlContent = this.nextElementSibling;
+                    const open = sqlContent.classList.toggle('visible');
+                    this.setAttribute('aria-expanded', String(open));
+                    this.textContent = (open ? '▼' : '▶') + ' Show SQL query' + rows;
+                });
+                const pre = document.createElement('div');
+                pre.className = 'sql-content';
+                pre.innerHTML = '<pre><code>' + escapeHtml(q.sql) + '</code></pre>';
+                detail.appendChild(toggle);
+                detail.appendChild(pre);
+                div.appendChild(detail);
+            } else if (sql) {
+                /* Legacy fallback — single sql string */
+                const detail = document.createElement('div');
+                detail.className = 'sql-detail';
+                const toggle = document.createElement('button');
+                toggle.className = 'sql-toggle';
+                toggle.setAttribute('aria-expanded', 'false');
+                toggle.textContent = '▶ Show SQL query';
+                toggle.addEventListener('click', function () {
+                    const sqlContent = this.nextElementSibling;
+                    const open = sqlContent.classList.toggle('visible');
+                    this.setAttribute('aria-expanded', String(open));
+                    this.textContent = (open ? '▼' : '▶') + ' Show SQL query';
+                });
+                const pre = document.createElement('div');
+                pre.className = 'sql-content';
+                pre.innerHTML = '<pre><code>' + escapeHtml(sql) + '</code></pre>';
+                detail.appendChild(toggle);
+                detail.appendChild(pre);
+                div.appendChild(detail);
+            }
+
+            /* ── Verified query indicator ───────────────────────────────── */
+            if (examplesUsed && examplesUsed > 0 && primarySql) {
+                const tag = document.createElement('div');
+                tag.className = 'verified-tag';
+                tag.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg> Informed by verified queries';
+                div.appendChild(tag);
+            }
+
+            /* ── Feedback buttons (only when SQL was used) ──────────────── */
+            if (primarySql && question) {
+                const fb = document.createElement('div');
+                fb.className = 'feedback-row';
+
+                /* Label — shown until the user votes for the first time this session */
+                const label = document.createElement('span');
+                label.className = 'feedback-label';
+                label.textContent = 'Was this helpful?';
+                if (hasVotedThisSession) label.classList.add('feedback-label-hidden');
+                fb.appendChild(label);
+
+                const upBtn = document.createElement('button');
+                upBtn.className = 'feedback-btn feedback-up';
+                upBtn.title = 'Good result — save this as a reference query';
+                upBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 10v12M15 5.88L14 10h5.83a2 2 0 0 1 1.92 2.56l-2.33 8A2 2 0 0 1 17.5 22H4a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h2.76a2 2 0 0 0 1.79-1.11L12 2h0a3.13 3.13 0 0 1 3 3.88Z"/></svg>';
+
+                const downBtn = document.createElement('button');
+                downBtn.className = 'feedback-btn feedback-down';
+                downBtn.title = 'Bad result';
+                downBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 14V2M9 18.12L10 14H4.17a2 2 0 0 1-1.92-2.56l2.33-8A2 2 0 0 1 6.5 2H20a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-2.76a2 2 0 0 0-1.79 1.11L12 22h0a3.13 3.13 0 0 1-3-3.88Z"/></svg>';
+
+                fb.appendChild(upBtn);
+                fb.appendChild(downBtn);
+
+                function sendFeedback(vote) {
+                    upBtn.disabled = true;
+                    downBtn.disabled = true;
+                    fb.classList.add('feedback-sent');
+                    fb.classList.add(vote === 'up' ? 'feedback-sent-up' : 'feedback-sent-down');
+
+                    /* Hide the label on all future feedback rows once they've voted */
+                    if (!hasVotedThisSession) {
+                        hasVotedThisSession = true;
+                        document.querySelectorAll('.feedback-label').forEach(function (el) {
+                            el.classList.add('feedback-label-hidden');
+                        });
+                    }
+
+                    fetch('/api/feedback', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ vote: vote, question: question, sql: primarySql }),
+                    }).then(function () {
+                        showToast(vote === 'up'
+                            ? 'Saved — this will help with similar questions'
+                            : 'Noted — thanks for the feedback');
+                    }).catch(function () {}); /* best-effort */
+                }
+
+                upBtn.addEventListener('click', function () { sendFeedback('up'); });
+                downBtn.addEventListener('click', function () { sendFeedback('down'); });
+                div.appendChild(fb);
+            }
+        } else {
+            div.textContent = content;
+        }
+
+        chatContainer.appendChild(div);
+        chatContainer.scrollTop = chatContainer.scrollHeight;
+        return div;
+    }
+
+    function addTyping() {
+        const div = document.createElement('div');
+        div.className = 'typing';
+        div.id = 'typing';
+        div.setAttribute('aria-label', 'Assistant is typing');
+        div.innerHTML = '<span></span><span></span><span></span><span class="typing-label"></span>';
+        chatContainer.appendChild(div);
+        chatContainer.scrollTop = chatContainer.scrollHeight;
+    }
+
+    function updateTypingLabel(text) {
+        const label = document.querySelector('#typing .typing-label');
+        if (label) label.textContent = text || '';
+    }
+
+    function removeTyping() {
+        const el = document.getElementById('typing');
+        if (el) el.remove();
+    }
+
+    async function sendMessage(anomalyContext) {
+        const msg = messageInput.value.trim();
+        if (!msg || isWaiting) return;
+
+        isWaiting = true;
+        stopSuggestionCycle();
+        sendBtn.disabled = true;
+        messageInput.value = '';
+        messageInput.style.height = 'auto';
+
+        addMessage('user', msg);
+        addTyping();
+
+        /* Progressive label — cycles through phases while waiting */
+        const phases = ['Thinking…', 'Running queries…', 'Analysing results…'];
+        let phase = 0;
+        const labelTimer = setInterval(function () {
+            phase++;
+            if (phase < phases.length) {
+                updateTypingLabel(phases[phase]);
+            }
+        }, 4000);
+        updateTypingLabel(phases[0]);
+
+        try {
+            const payload = { message: msg, session_id: sessionId, source: querySource };
+            if (anomalyContext) payload.anomaly_context = anomalyContext;
+            const resp = await fetch('/api/chat', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload),
+            });
+            const data = await resp.json();
+            clearInterval(labelTimer);
+            removeTyping();
+            addMessage('assistant', data.response || data.error || 'No response', data.sql, data.queries, data.question, data.examples_used, data.error_detail);
+            // Show pending memory approvals if any
+            if (data.pending_memories && data.pending_memories.length) {
+                renderPendingMemories(data.pending_memories);
+            }
+            // Refresh memory bar in case memories were loaded
+            loadMemories();
+        } catch (err) {
+            clearInterval(labelTimer);
+            removeTyping();
+            addMessage('assistant', 'Connection error: ' + err.message);
+        }
+
+        isWaiting = false;
+        querySource = 'typed';
+        sendBtn.disabled = false;
+        messageInput.focus();
+    }
+
+    async function clearChat() {
+        try {
+            await fetch('/api/history', {
+                method: 'DELETE',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ session_id: sessionId }),
+            });
+        } catch (_) {}
+
+        chatContainer.innerHTML = '';
+        const w = document.createElement('div');
+        w.className = 'welcome';
+        w.id = 'welcome';
+        w.innerHTML = `
+            <div class="welcome-brand"><img src="/static/icon.png" alt="Logo"><span class="brand-name">${document.title}</span></div>
+            <h2>Ask anything about your service data</h2>
+            <p id="welcomeDesc">I can query ConnectWise tickets, time entries, and agreements. Ask me in plain English.</p>
+            <div class="insight-chip-section" id="insightChipSection" style="display:none;">
+                <div class="suggestions" id="insightChipContainer" role="list" aria-label="Live insights"></div>
+            </div>
+            <div class="suggestions" id="suggestionContainer" role="list" aria-label="Suggested questions"></div>
+        `;
+        chatContainer.appendChild(w);
+        // Re-apply the live service description now that the DOM is rebuilt
+        loadInsightChips();
+        startSuggestionCycle();
+    }
+
+    // ── Simple markdown renderer ──────────────────────────────────────────────
+    function renderMarkdown(text) {
+        if (!text) return '';
+        let html = escapeHtml(text);
+
+        // Code blocks (must come before inline code)
+        html = html.replace(/```(\w*)\n([\s\S]*?)```/g, '<pre><code>$2</code></pre>');
+
+        // Inline code
+        html = html.replace(/`([^`]+)`/g, '<code>$1</code>');
+
+        // Bold / italic
+        html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+        html = html.replace(/\*(.+?)\*/g,     '<em>$1</em>');
+
+        // Headers
+        html = html.replace(/^### (.+)$/gm, '<h4 style="margin:12px 0 4px;color:var(--accent)">$1</h4>');
+        html = html.replace(/^## (.+)$/gm,  '<h3 style="margin:12px 0 4px;color:var(--accent)">$1</h3>');
+
+        // Unordered lists
+        html = html.replace(/^- (.+)$/gm, '<li>$1</li>');
+        html = html.replace(/(<li>.*<\/li>\n?)+/g, '<ul>$&</ul>');
+
+        // Numbered lists
+        html = html.replace(/^\d+\. (.+)$/gm, '<li>$1</li>');
+
+        // Tables (pipe-delimited)
+        html = html.replace(/^\|(.+)\|$/gm, function (match, content) {
+            const cells = content.split('|').map(c => c.trim());
+            if (cells.every(c => /^[-:]+$/.test(c))) return '';
+            return '<tr>' + cells.map(c => `<td>${c}</td>`).join('') + '</tr>';
+        });
+        html = html.replace(/(<tr>.*<\/tr>\s*)+/g, '<table>$&</table>');
+
+        // Paragraphs
+        html = html.replace(/\n\n/g, '</p><p>');
+        html = '<p>' + html + '</p>';
+        html = html.replace(/<p><\/p>/g, '');
+        html = html.replace(/<p>(<h[34]|<pre|<ul|<table)/g, '$1');
+        html = html.replace(/(<\/h[34]>|<\/pre>|<\/ul>|<\/table>)<\/p>/g, '$1');
+
+        return html;
+    }
+
+    function escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+
+    // Focus input on load
+    messageInput.focus();
+
+    // ── Memory bar ───────────────────────────────────────────────────────────
+
+    const MEMORY_LIMIT = 5;
+
+    async function loadMemories() {
+        try {
+            const res  = await fetch('/api/memory');
+            const data = await res.json();
+            renderMemories(data.memories || [], data.count ?? 0, data.limit ?? MEMORY_LIMIT);
+        } catch (e) {
+            console.warn('loadMemories failed:', e);
+        }
+    }
+
+    function renderMemories(memories, count, limit) {
+        _updateMemorySlots(count, limit);
+
+        const chips = document.getElementById('memoryBarChips');
+        if (!chips) return;
+
+        if (!memories || memories.length === 0) {
+            chips.innerHTML = '<span class="memory-bar-empty">Nothing remembered yet.</span>';
+            return;
+        }
+
+        chips.innerHTML = '';
+        memories.forEach(m => {
+            const chip = document.createElement('div');
+            chip.className = 'memory-chip';
+            chip.dataset.memoryId = m.id;
+            chip.title = m.value;   // full text on hover
+            chip.innerHTML = `
+                <span class="memory-chip-text">${escapeHtml(m.value)}</span>
+                <button class="memory-chip-del" title="Forget this"
+                        onclick="confirmDeleteMemory(${m.id}, this)">✕</button>
+            `;
+            chips.appendChild(chip);
+        });
+    }
+
+    function _updateMemorySlots(count, limit) {
+        const container = document.getElementById('memorySlots');
+        if (!container) return;
+        const slots = container.querySelectorAll('.memory-slot');
+        const atLimit = count >= limit;
+        container.classList.toggle('full', atLimit);
+        slots.forEach((slot, i) => {
+            const filled = (i + 1) <= count;
+            slot.classList.toggle('used', filled);
+            slot.classList.toggle('last', filled && (i + 1) === count && !atLimit);
+        });
+    }
+
+    function confirmDeleteMemory(id, btn) {
+        const chip = btn.closest('.memory-chip');
+        if (chip.classList.contains('confirming')) return;
+        chip.classList.add('confirming');
+
+        // Replace chip contents with inline confirm
+        chip.innerHTML = `
+            <span class="memory-chip-confirm-text">Forget?</span>
+            <button class="memory-chip-confirm-yes" onclick="deleteMemory(${id})">Yes</button>
+            <button class="memory-chip-confirm-no"  onclick="loadMemories()">No</button>
+        `;
+    }
+
+    async function deleteMemory(id) {
+        try {
+            const res = await fetch(`/api/memory/${id}`, { method: 'DELETE' });
+            if (res.ok) { await loadMemories(); }
+            else { console.error('Delete failed', await res.json()); }
+        } catch (e) {
+            console.error('deleteMemory error:', e);
+        }
+    }
+
+    // ── Pending memory approval UI ───────────────────────────────────────────
+    function renderPendingMemories(pendingMemories) {
+        if (!pendingMemories || !pendingMemories.length) return;
+
+        const wrapper = document.createElement('div');
+        wrapper.className = 'pending-memories';
+
+        pendingMemories.forEach(function (mem, idx) {
+            const card = document.createElement('div');
+            card.className = 'pending-memory-card';
+            card.dataset.idx = idx;
+
+            const icon = document.createElement('div');
+            icon.className = 'pending-memory-icon';
+            icon.textContent = mem.action === 'delete' ? '🗑' : '💾';
+
+            const body = document.createElement('div');
+            body.className = 'pending-memory-body';
+
+            const label = document.createElement('div');
+            label.className = 'pending-memory-label';
+            if (mem.action === 'store') {
+                label.textContent = 'Agent wants to remember:';
+            } else if (mem.action === 'update') {
+                label.textContent = 'Agent wants to update memory:';
+            } else if (mem.action === 'delete') {
+                label.textContent = 'Agent wants to forget:';
+            }
+
+            const value = document.createElement('div');
+            value.className = 'pending-memory-value';
+            if (mem.action === 'delete') {
+                value.innerHTML = 'Memory #' + escapeHtml(String(mem.memory_id));
+            } else {
+                value.innerHTML = '<strong>' + escapeHtml(mem.key) + '</strong> — ' + escapeHtml(mem.value);
+            }
+
+            body.appendChild(label);
+            body.appendChild(value);
+
+            const actions = document.createElement('div');
+            actions.className = 'pending-memory-actions';
+
+            const approveBtn = document.createElement('button');
+            approveBtn.className = 'approve-btn';
+            approveBtn.textContent = 'Approve';
+            approveBtn.addEventListener('click', function () {
+                approveMemory(mem, card);
+            });
+
+            const dismissBtn = document.createElement('button');
+            dismissBtn.textContent = 'Dismiss';
+            dismissBtn.addEventListener('click', function () {
+                card.classList.add('dismissed');
+                approveBtn.disabled = true;
+                dismissBtn.disabled = true;
+                dismissBtn.textContent = 'Dismissed';
+            });
+
+            actions.appendChild(approveBtn);
+            actions.appendChild(dismissBtn);
+
+            card.appendChild(icon);
+            card.appendChild(body);
+            card.appendChild(actions);
+            wrapper.appendChild(card);
+        });
+
+        chatContainer.appendChild(wrapper);
+        chatContainer.scrollTop = chatContainer.scrollHeight;
+    }
+
+    async function approveMemory(mem, card) {
+        const btns = card.querySelectorAll('button');
+        btns.forEach(function (b) { b.disabled = true; });
+
+        try {
+            const payload = {
+                action: mem.action,
+                session_id: sessionId,
+            };
+            if (mem.key) payload.key = mem.key;
+            if (mem.value) payload.value = mem.value;
+            if (mem.memory_id) payload.memory_id = mem.memory_id;
+
+            const res = await fetch('/api/memory/approve', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload),
+            });
+            const data = await res.json();
+
+            if (data.ok) {
+                card.classList.add('approved');
+                const approveBtn = card.querySelector('.approve-btn');
+                if (approveBtn) approveBtn.textContent = 'Saved';
+                showToast(data.message || 'Memory saved');
+                loadMemories();
+            } else {
+                showToast('Failed: ' + (data.message || 'Unknown error'));
+                btns.forEach(function (b) { b.disabled = false; });
+            }
+        } catch (e) {
+            showToast('Error saving memory');
+            btns.forEach(function (b) { b.disabled = false; });
+        }
+    }
+
+</script>
+
+</body>
+</html>

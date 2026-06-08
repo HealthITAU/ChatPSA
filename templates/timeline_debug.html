@@ -1,0 +1,652 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Timeline Debug — {{ app_name }}</title>
+    <link rel="icon" type="image/x-icon" href="/static/favicon.ico">
+    <link rel="icon" type="image/png" sizes="32x32" href="/static/favicon-32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="/static/favicon-16.png">
+    <link rel="apple-touch-icon" sizes="180x180" href="/static/apple-touch-icon.png">
+    <style>
+        /* ── Dark theme (default) ──────────────────────────────────────────── */
+        :root, [data-theme="dark"] {
+            --bg: #0f1117;
+            --surface: #1a1d27;
+            --surface-hover: #242736;
+            --border: #2e3142;
+            --text: #e1e4ed;
+            --text-muted: #8b8fa3;
+            --accent: #6c63ff;
+            --success: #34d399;
+            --warning: #fbbf24;
+            --error: #f87171;
+        }
+
+        /* ── Light theme ───────────────────────────────────────────────────── */
+        [data-theme="light"] {
+            --bg: #f5f6f8;
+            --surface: #ffffff;
+            --surface-hover: #f0f1f4;
+            --border: #dcdee4;
+            --text: #1a1d27;
+            --text-muted: #6b7084;
+            --accent: #5b52e0;
+            --success: #16a369;
+            --warning: #d97706;
+            --error: #dc2626;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            transition: background 0.2s, color 0.2s;
+        }
+
+        .page { padding: 24px 40px; }
+
+        /* ── Filters ────────────────────────────────────────────────────────── */
+        .filter-bar {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+        .filter-bar select,
+        .filter-bar input {
+            padding: 7px 12px;
+            border-radius: 6px;
+            border: 1px solid var(--border);
+            background: var(--surface);
+            color: var(--text);
+            font-size: 13px;
+            outline: none;
+        }
+        .filter-bar select:focus,
+        .filter-bar input:focus { border-color: var(--accent); }
+        .filter-bar label {
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            color: var(--text-muted);
+        }
+        .result-count {
+            margin-left: auto;
+            font-size: 12px;
+            color: var(--text-muted);
+        }
+
+        /* ── Exclusions panel ───────────────────────────────────────────────── */
+        .exclusions-panel {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 16px 20px;
+            margin-bottom: 24px;
+        }
+        .exclusions-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 12px;
+            cursor: pointer;
+        }
+        .exclusions-title {
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .exclusions-title .count-badge {
+            font-size: 11px;
+            font-weight: 600;
+            background: rgba(108, 99, 255, 0.15);
+            color: var(--accent);
+            padding: 1px 8px;
+            border-radius: 10px;
+        }
+        .exclusions-chevron {
+            transition: transform 0.2s;
+            color: var(--text-muted);
+        }
+        .exclusions-panel.collapsed .exclusions-chevron { transform: rotate(-90deg); }
+        .exclusions-panel.collapsed .exclusions-body { display: none; }
+
+        .exclusions-body { margin-top: 8px; }
+
+        .add-exclusion-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 12px;
+        }
+        .add-exclusion-row select,
+        .add-exclusion-row input {
+            padding: 6px 10px;
+            border-radius: 5px;
+            border: 1px solid var(--border);
+            background: var(--bg);
+            color: var(--text);
+            font-size: 12px;
+            outline: none;
+        }
+        .add-exclusion-row input { flex: 1; min-width: 200px; }
+        .add-exclusion-row select:focus,
+        .add-exclusion-row input:focus { border-color: var(--accent); }
+
+        .btn-add {
+            padding: 6px 14px;
+            border-radius: 5px;
+            border: 1px solid var(--accent);
+            background: rgba(108, 99, 255, 0.1);
+            color: var(--accent);
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            white-space: nowrap;
+        }
+        .btn-add:hover { background: rgba(108, 99, 255, 0.2); }
+
+        .exclusion-list { display: flex; flex-wrap: wrap; gap: 6px; }
+
+        .exclusion-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 4px 10px;
+            border-radius: 14px;
+            font-size: 11px;
+            border: 1px solid var(--border);
+            background: var(--bg);
+        }
+        .exclusion-chip .type-label {
+            font-weight: 600;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            font-size: 9px;
+            letter-spacing: 0.04em;
+        }
+        .exclusion-chip.bypass { border-color: rgba(52, 211, 153, 0.3); }
+        .exclusion-chip.bypass .type-label { color: var(--success); }
+        .exclusion-chip .value-label { color: var(--text); }
+        .exclusion-chip .remove-btn {
+            background: none;
+            border: none;
+            color: var(--text-muted);
+            cursor: pointer;
+            font-size: 14px;
+            line-height: 1;
+            padding: 0 2px;
+        }
+        .exclusion-chip .remove-btn:hover { color: var(--error); }
+
+        .no-exclusions {
+            font-size: 12px;
+            color: var(--text-muted);
+            font-style: italic;
+        }
+
+        /* ── Table ──────────────────────────────────────────────────────────── */
+        .debug-table-wrap {
+            overflow-x: auto;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 12px;
+        }
+        th {
+            text-align: left;
+            padding: 10px 12px;
+            background: var(--surface);
+            color: var(--text-muted);
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            border-bottom: 1px solid var(--border);
+            white-space: nowrap;
+            cursor: pointer;
+            user-select: none;
+        }
+        th:hover { color: var(--text); }
+        th .sort-arrow { font-size: 10px; margin-left: 4px; }
+
+        td {
+            padding: 8px 12px;
+            border-bottom: 1px solid var(--border);
+            vertical-align: top;
+        }
+        tr:hover td { background: var(--surface-hover); }
+
+        .status-active { color: var(--success); }
+        .status-dismissed { color: var(--text-muted); text-decoration: line-through; }
+        .status-excluded { color: var(--warning); text-decoration: line-through; }
+
+        .match-highlight {
+            background: rgba(108, 99, 255, 0.2);
+            padding: 1px 4px;
+            border-radius: 3px;
+            font-weight: 600;
+        }
+
+        .pattern-badge {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 10px;
+            font-size: 10px;
+            font-weight: 600;
+            background: rgba(108, 99, 255, 0.15);
+            color: var(--accent);
+        }
+
+        .btn-sm {
+            padding: 3px 8px;
+            font-size: 11px;
+            border-radius: 4px;
+            border: 1px solid var(--border);
+            background: transparent;
+            color: var(--text-muted);
+            cursor: pointer;
+            white-space: nowrap;
+        }
+        .btn-sm:hover { border-color: var(--accent); color: var(--accent); }
+        .btn-sm.restore:hover { border-color: var(--success); color: var(--success); }
+        .btn-sm.dismiss:hover { border-color: var(--error); color: var(--error); }
+        .btn-sm.exclude:hover { border-color: var(--warning); color: var(--warning); }
+
+        .action-group { display: flex; gap: 4px; }
+
+        .context-cell {
+            max-width: 300px;
+            word-break: break-word;
+            font-style: italic;
+            color: var(--text-muted);
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 40px;
+            color: var(--text-muted);
+            font-size: 13px;
+        }
+    </style>
+    <script>
+        (function(){
+            var t = null; try { t = localStorage.getItem('timeline-theme'); } catch(e) {}
+            if (t) document.documentElement.setAttribute('data-theme', t);
+        })();
+    </script>
+</head>
+<body>
+
+{% include '_nav.html' %}
+
+<div class="page">
+    <!-- Exclusions panel -->
+    <div class="exclusions-panel" id="exclusionsPanel">
+        <div class="exclusions-header" onclick="toggleExclusions()">
+            <span class="exclusions-title">
+                Exclusion Rules
+                <span class="count-badge" id="exclusionCount">0</span>
+            </span>
+            <svg class="exclusions-chevron" width="16" height="16" viewBox="0 0 16 16"
+                 fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="5,3 11,8 5,13"/>
+            </svg>
+        </div>
+        <div class="exclusions-body">
+            <div class="add-exclusion-row">
+                <select id="excType">
+                    <option value="substring">Substring</option>
+                    <option value="ticket_id">Ticket ID</option>
+                    <option value="board">Board</option>
+                    <option value="company">Company</option>
+                    <option value="bypass_email">Bypass Email</option>
+                </select>
+                <input type="text" id="excValue" placeholder="e.g. 'Date of Birth' or '98765'" autocomplete="off" onfocus="updatePlaceholder()">
+                <button class="btn-add" onclick="addExclusion()">Add Exclusion</button>
+            </div>
+            <div class="exclusion-list" id="exclusionList">
+                <span class="no-exclusions">No exclusions defined</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filters -->
+    <div class="filter-bar">
+        <label for="patternFilter">Pattern</label>
+        <select id="patternFilter">
+            <option value="">All</option>
+        </select>
+        <label for="statusFilter">Status</label>
+        <select id="statusFilter">
+            <option value="">All</option>
+            <option value="active">Active</option>
+            <option value="dismissed">Dismissed</option>
+            <option value="excluded">Excluded</option>
+        </select>
+        <label for="boardFilter">Board</label>
+        <select id="boardFilter">
+            <option value="">All</option>
+        </select>
+        <label for="companyFilter">Company</label>
+        <input type="text" id="companyFilter" placeholder="Search..." autocomplete="off">
+        <label for="confidenceFilter">Confidence</label>
+        <select id="confidenceFilter">
+            <option value="">All</option>
+            <option value="confirmed">Confirmed</option>
+            <option value="likely">Likely</option>
+            <option value="tentative">Tentative</option>
+        </select>
+        <span class="result-count" id="resultCount"></span>
+    </div>
+
+    <div id="tableContainer">
+        <div class="empty-state">Loading...</div>
+    </div>
+</div>
+
+<script>
+(function() {
+    var allEvents = [];
+    var exclusions = [];
+    var debounceTimer = null;
+    var sortCol = 'parsed_date';
+    var sortAsc = true;
+
+    // ── Exclusions ───────────────────────────────────────────────────────
+
+    function fetchExclusions() {
+        fetch('/api/timeline/exclusions')
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                exclusions = data.exclusions || [];
+                renderExclusions();
+            });
+    }
+
+    function renderExclusions() {
+        var list = document.getElementById('exclusionList');
+        document.getElementById('exclusionCount').textContent = exclusions.length;
+
+        if (exclusions.length === 0) {
+            list.innerHTML = '<span class="no-exclusions">No exclusions defined</span>';
+            return;
+        }
+
+        var html = '';
+        exclusions.forEach(function(exc) {
+            var cls = exc.type === 'bypass_email' ? 'exclusion-chip bypass' : 'exclusion-chip';
+            html += '<span class="' + cls + '">';
+            html += '<span class="type-label">' + esc(exc.type) + '</span>';
+            html += '<span class="value-label">' + esc(exc.value) + '</span>';
+            html += '<button class="remove-btn" onclick="removeExclusion(' + exc.id + ')" title="Remove">&times;</button>';
+            html += '</span>';
+        });
+        list.innerHTML = html;
+    }
+
+    var placeholders = {
+        substring: "e.g. 'Date of Birth' or 'installed on'",
+        ticket_id: "e.g. '98765'",
+        board: "e.g. 'Help Desk'",
+        company: "e.g. 'Catchall'",
+        bypass_email: "e.g. 'jane@example.com'"
+    };
+    window.updatePlaceholder = function() {
+        var type = document.getElementById('excType').value;
+        document.getElementById('excValue').placeholder = placeholders[type] || '';
+    };
+    document.getElementById('excType').addEventListener('change', updatePlaceholder);
+
+    window.addExclusion = function() {
+        var type = document.getElementById('excType').value;
+        var value = document.getElementById('excValue').value.trim();
+        if (!value) return;
+
+        fetch('/api/timeline/exclusions', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ type: type, value: value })
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            if (data.ok) {
+                document.getElementById('excValue').value = '';
+                fetchExclusions();
+                fetchData();  // Refresh table — events may have been excluded
+            } else {
+                alert(data.error || 'Failed to add exclusion');
+            }
+        });
+    };
+
+    window.removeExclusion = function(id) {
+        fetch('/api/timeline/exclusions/' + id, { method: 'DELETE' })
+            .then(function(r) { return r.json(); })
+            .then(function() {
+                fetchExclusions();
+            });
+    };
+
+    window.addExclusionFromRow = function(type, value) {
+        document.getElementById('excType').value = type;
+        document.getElementById('excValue').value = value;
+        addExclusion();
+    };
+
+    window.toggleExclusions = function() {
+        document.getElementById('exclusionsPanel').classList.toggle('collapsed');
+    };
+
+    // Allow Enter to submit
+    document.getElementById('excValue').addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') addExclusion();
+    });
+
+    // ── Events table ─────────────────────────────────────────────────────
+
+    function fetchData() {
+        var params = new URLSearchParams();
+        var pattern = document.getElementById('patternFilter').value;
+        var status = document.getElementById('statusFilter').value;
+        var company = document.getElementById('companyFilter').value.trim();
+        var board = document.getElementById('boardFilter').value;
+        if (pattern) params.set('pattern', pattern);
+        if (status) params.set('status', status);
+        if (company) params.set('company', company);
+        if (board) params.set('board', board);
+
+        fetch('/api/timeline/debug?' + params.toString())
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                allEvents = data.events || [];
+                populatePatternFilter(data.patterns || []);
+                populateBoardFilter();
+                renderTable();
+            })
+            .catch(function(err) {
+                document.getElementById('tableContainer').innerHTML =
+                    '<div class="empty-state">Error: ' + err.message + '</div>';
+            });
+    }
+
+    function populateBoardFilter() {
+        var sel = document.getElementById('boardFilter');
+        var current = sel.value;
+        var boards = {};
+        allEvents.forEach(function(e) {
+            if (e.board_name) boards[e.board_name] = (boards[e.board_name] || 0) + 1;
+        });
+        if (!current) {
+            sel.innerHTML = '<option value="">All</option>';
+            Object.keys(boards).sort().forEach(function(b) {
+                var opt = document.createElement('option');
+                opt.value = b;
+                opt.textContent = b + ' (' + boards[b] + ')';
+                sel.appendChild(opt);
+            });
+        }
+    }
+
+    function populatePatternFilter(patterns) {
+        var sel = document.getElementById('patternFilter');
+        var current = sel.value;
+        sel.innerHTML = '<option value="">All</option>';
+        patterns.forEach(function(p) {
+            var opt = document.createElement('option');
+            opt.value = p.name;
+            opt.textContent = p.name + ' (' + p.count + ')';
+            if (p.name === current) opt.selected = true;
+            sel.appendChild(opt);
+        });
+    }
+
+    function renderTable() {
+        var container = document.getElementById('tableContainer');
+        var confFilter = document.getElementById('confidenceFilter').value;
+        var data = allEvents.filter(function(e) {
+            if (confFilter && (e.confidence || 'confirmed') !== confFilter) return false;
+            return true;
+        });
+
+        document.getElementById('resultCount').textContent =
+            data.length + ' match' + (data.length !== 1 ? 'es' : '');
+
+        if (data.length === 0) {
+            container.innerHTML = '<div class="empty-state">No matches found.</div>';
+            return;
+        }
+
+        // Sort
+        data.sort(function(a, b) {
+            var va = a[sortCol] || '';
+            var vb = b[sortCol] || '';
+            if (va < vb) return sortAsc ? -1 : 1;
+            if (va > vb) return sortAsc ? 1 : -1;
+            return 0;
+        });
+
+        var cols = [
+            { key: 'parsed_date', label: 'Date' },
+            { key: 'confidence', label: 'Conf.' },
+            { key: 'pattern_name', label: 'Pattern' },
+            { key: 'matched_text', label: 'Matched' },
+            { key: 'context_snippet', label: 'Context' },
+            { key: 'company_name', label: 'Company' },
+            { key: 'board_name', label: 'Board' },
+            { key: 'ticket_id', label: 'Ticket' },
+            { key: 'member_name', label: 'Author' },
+            { key: 'status', label: 'Status' },
+        ];
+
+        var html = '<div class="debug-table-wrap"><table><thead><tr>';
+        cols.forEach(function(c) {
+            var arrow = '';
+            if (c.key === sortCol) arrow = sortAsc ? ' ▲' : ' ▼';
+            html += '<th data-col="' + c.key + '">' + c.label +
+                '<span class="sort-arrow">' + arrow + '</span></th>';
+        });
+        html += '<th>Actions</th></tr></thead><tbody>';
+
+        data.forEach(function(e) {
+            html += '<tr>';
+            html += '<td>' + esc(e.parsed_date) + '</td>';
+            var conf = e.confidence || 'confirmed';
+            var confLabel = conf.charAt(0).toUpperCase() + conf.slice(1);
+            var confColor = conf === 'confirmed' ? 'var(--success)' : conf === 'likely' ? 'var(--warning)' : 'var(--error)';
+            html += '<td><span style="font-size:10px;font-weight:600;color:' + confColor + ';">' + confLabel + '</span></td>';
+            html += '<td><span class="pattern-badge">' + esc(e.pattern_name) + '</span></td>';
+            html += '<td><span class="match-highlight">' + esc(e.matched_text) + '</span></td>';
+            html += '<td class="context-cell">' + esc(e.context_snippet || '') + '</td>';
+            html += '<td>' + esc(e.company_name || '') + '</td>';
+            html += '<td>' + esc(e.board_name || '') + '</td>';
+            html += '<td>' + (e.ticket_id || '') + '</td>';
+            html += '<td>' + esc(e.member_name || '') + '</td>';
+            html += '<td class="status-' + (e.status || 'active') + '">' + esc(e.status || 'active') + '</td>';
+            html += '<td><div class="action-group">';
+            if (e.status === 'dismissed' || e.status === 'excluded') {
+                html += '<button class="btn-sm restore" onclick="restoreEvent(' + e.id + ')">Restore</button>';
+            } else {
+                html += '<button class="btn-sm dismiss" onclick="dismissEvent(' + e.id + ')">Dismiss</button>';
+            }
+            // Quick-exclude buttons
+            if (e.ticket_id && e.status !== 'excluded') {
+                html += '<button class="btn-sm exclude" onclick="addExclusionFromRow(\'ticket_id\',\'' + e.ticket_id + '\')" title="Exclude all dates from ticket #' + e.ticket_id + '">Excl Ticket</button>';
+            }
+            if (e.board_name && e.status !== 'excluded') {
+                html += '<button class="btn-sm exclude" onclick="addExclusionFromRow(\'board\',\'' + esc(e.board_name).replace(/'/g, "\\'") + '\')" title="Exclude all dates from board: ' + esc(e.board_name) + '">Excl Board</button>';
+            }
+            if (e.company_name && e.status !== 'excluded') {
+                html += '<button class="btn-sm exclude" onclick="addExclusionFromRow(\'company\',\'' + esc(e.company_name).replace(/'/g, "\\'") + '\')" title="Exclude all dates from company: ' + esc(e.company_name) + '">Excl Company</button>';
+            }
+            html += '</div></td>';
+            html += '</tr>';
+        });
+
+        html += '</tbody></table></div>';
+        container.innerHTML = html;
+
+        // Wire up column sorting
+        container.querySelectorAll('th[data-col]').forEach(function(th) {
+            th.addEventListener('click', function() {
+                var col = th.getAttribute('data-col');
+                if (sortCol === col) {
+                    sortAsc = !sortAsc;
+                } else {
+                    sortCol = col;
+                    sortAsc = true;
+                }
+                renderTable();
+            });
+        });
+    }
+
+    function esc(s) {
+        if (!s) return '';
+        var d = document.createElement('div');
+        d.appendChild(document.createTextNode(s));
+        return d.innerHTML;
+    }
+
+    window.dismissEvent = function(id) {
+        fetch('/api/timeline/' + id + '/dismiss', { method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+        }).then(function() { fetchData(); });
+    };
+
+    window.restoreEvent = function(id) {
+        fetch('/api/timeline/' + id + '/restore', { method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+        }).then(function() { fetchData(); });
+    };
+
+    // Filter wiring
+    document.getElementById('patternFilter').addEventListener('change', fetchData);
+    document.getElementById('statusFilter').addEventListener('change', fetchData);
+    document.getElementById('boardFilter').addEventListener('change', fetchData);
+    document.getElementById('confidenceFilter').addEventListener('change', renderTable);
+    document.getElementById('companyFilter').addEventListener('input', function() {
+        clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(fetchData, 400);
+    });
+
+    // Initial load
+    fetchExclusions();
+    fetchData();
+})();
+</script>
+
+</body>
+</html>

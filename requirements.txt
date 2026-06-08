@@ -1,0 +1,5 @@
+flask>=3.0
+anthropic>=0.40
+msal>=1.28
+gunicorn>=22.0
+requests>=2.31

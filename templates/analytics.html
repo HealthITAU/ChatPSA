@@ -1,0 +1,865 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Usage Analytics — {{ app_name }}</title>
+    <link rel="icon" type="image/x-icon" href="/static/favicon.ico">
+    <link rel="icon" type="image/png" sizes="32x32" href="/static/favicon-32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="/static/favicon-16.png">
+    <link rel="apple-touch-icon" sizes="180x180" href="/static/apple-touch-icon.png">
+    <style>
+        :root, [data-theme="dark"] {
+            --bg: #0f1117;
+            --surface: #1a1d27;
+            --surface-hover: #242736;
+            --border: #2e3142;
+            --text: #e1e4ed;
+            --text-muted: #8b8fa3;
+            --accent: #6c63ff;
+            --accent-hover: #5a52d5;
+            --success: #34d399;
+            --warning: #fbbf24;
+            --error: #f87171;
+            --code-bg: #151822;
+        }
+        [data-theme="light"] {
+            --bg: #f5f6f8;
+            --surface: #ffffff;
+            --surface-hover: #f0f1f4;
+            --border: #dcdee4;
+            --text: #1a1d27;
+            --text-muted: #6b7084;
+            --accent: #5b52e0;
+            --accent-hover: #4a42c0;
+            --success: #16a369;
+            --warning: #d97706;
+            --error: #dc2626;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+        }
+
+        /* Layout */
+        .page { max-width: 1200px; margin: 0 auto; padding: 24px; }
+
+        .page-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 24px;
+        }
+        .page-header h2 {
+            font-size: 20px;
+            font-weight: 700;
+        }
+        .page-header .subtitle {
+            font-size: 13px;
+            color: var(--text-muted);
+            margin-top: 2px;
+        }
+
+        /* Stat cards */
+        .stat-row {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+            gap: 12px;
+            margin-bottom: 24px;
+        }
+
+        .stat-card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 16px 18px;
+            transition: border-color 0.15s;
+        }
+        .stat-card:hover { border-color: var(--accent); }
+
+        .stat-card .label {
+            font-size: 11px;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 6px;
+        }
+
+        .stat-card .value {
+            font-size: 26px;
+            font-weight: 700;
+            color: var(--accent);
+            font-variant-numeric: tabular-nums;
+        }
+        .stat-card .value.success { color: var(--success); }
+        .stat-card .value.warning { color: var(--warning); }
+        .stat-card .value.error { color: var(--error); }
+
+        .stat-card .sub {
+            font-size: 11px;
+            color: var(--text-muted);
+            margin-top: 3px;
+        }
+
+        /* Grid layouts */
+        .grid-2 {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+            margin-bottom: 16px;
+        }
+        .grid-3 {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 16px;
+            margin-bottom: 16px;
+        }
+
+        @media (max-width: 900px) { .grid-3 { grid-template-columns: 1fr; } }
+        @media (max-width: 768px) { .grid-2 { grid-template-columns: 1fr; } }
+
+        .card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 16px;
+        }
+
+        .card h3 {
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .card h3 .generate-btn {
+            margin-left: auto;
+            background: none;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            color: var(--text-muted);
+            font-size: 11px;
+            padding: 3px 10px;
+            cursor: pointer;
+            transition: all 0.15s;
+            text-transform: none;
+            letter-spacing: 0;
+            font-weight: 500;
+        }
+        .card h3 .generate-btn:hover {
+            border-color: var(--accent);
+            color: var(--accent);
+        }
+        .card h3 .generate-btn.loading {
+            opacity: 0.5;
+            pointer-events: none;
+        }
+
+        /* Table */
+        table { width: 100%; border-collapse: collapse; font-size: 13px; }
+        th {
+            text-align: left;
+            padding: 8px 12px;
+            color: var(--text-muted);
+            font-weight: 500;
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            border-bottom: 1px solid var(--border);
+        }
+        td { padding: 10px 12px; border-bottom: 1px solid var(--border); }
+        tr:last-child td { border-bottom: none; }
+        tr:hover td { background: var(--surface-hover); }
+
+        .badge {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 99px;
+            font-size: 11px;
+            font-weight: 500;
+        }
+        .badge-suggested { background: rgba(108,99,255,0.2); color: var(--accent); }
+        .badge-typed { background: rgba(139,143,163,0.2); color: var(--text-muted); }
+        .badge-error { background: rgba(248,113,113,0.2); color: var(--error); }
+
+        /* Bar chart */
+        .bar-chart { display: flex; flex-direction: column; gap: 8px; }
+        .bar-row { display: flex; align-items: center; gap: 10px; font-size: 13px; }
+        .bar-label { width: 120px; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex-shrink: 0; font-size: 12px; }
+        .bar-track { flex: 1; background: var(--bg); border-radius: 4px; height: 8px; overflow: hidden; }
+        .bar-fill { height: 100%; background: var(--accent); border-radius: 4px; transition: width 0.6s ease; }
+        .bar-count { width: 36px; text-align: right; color: var(--text-muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+
+        /* Daily chart */
+        .daily-chart {
+            display: flex;
+            align-items: flex-end;
+            gap: 3px;
+            height: 100px;
+            padding-top: 8px;
+        }
+        .day-bar {
+            flex: 1;
+            background: var(--accent);
+            border-radius: 3px 3px 0 0;
+            opacity: 0.7;
+            min-height: 2px;
+            position: relative;
+            cursor: default;
+            transition: opacity 0.15s;
+        }
+        .day-bar:hover { opacity: 1; }
+        .day-bar[title]:hover::after {
+            content: attr(title);
+            position: absolute;
+            bottom: calc(100% + 6px);
+            left: 50%;
+            transform: translateX(-50%);
+            background: var(--surface-hover);
+            border: 1px solid var(--border);
+            color: var(--text);
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            white-space: nowrap;
+            pointer-events: none;
+            z-index: 10;
+        }
+        .chart-axis {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 6px;
+            font-size: 11px;
+            color: var(--text-muted);
+        }
+
+        /* Hourly heatmap */
+        .hourly-grid {
+            display: grid;
+            grid-template-columns: repeat(24, 1fr);
+            gap: 3px;
+        }
+        .hour-cell {
+            aspect-ratio: 1;
+            border-radius: 4px;
+            position: relative;
+            cursor: default;
+            min-height: 24px;
+            transition: transform 0.1s;
+        }
+        .hour-cell:hover { transform: scale(1.15); z-index: 1; }
+        .hour-cell[title]:hover::after {
+            content: attr(title);
+            position: absolute;
+            bottom: calc(100% + 4px);
+            left: 50%;
+            transform: translateX(-50%);
+            background: var(--surface-hover);
+            border: 1px solid var(--border);
+            color: var(--text);
+            padding: 3px 6px;
+            border-radius: 4px;
+            font-size: 10px;
+            white-space: nowrap;
+            pointer-events: none;
+            z-index: 10;
+        }
+        .hour-labels {
+            display: grid;
+            grid-template-columns: repeat(24, 1fr);
+            gap: 3px;
+            margin-top: 4px;
+        }
+        .hour-labels span {
+            text-align: center;
+            font-size: 9px;
+            color: var(--text-muted);
+        }
+
+        /* Response time line chart (CSS-only) */
+        .line-chart {
+            display: flex;
+            align-items: flex-end;
+            gap: 2px;
+            height: 80px;
+            padding-top: 8px;
+        }
+        .line-bar {
+            flex: 1;
+            border-radius: 2px 2px 0 0;
+            min-height: 2px;
+            position: relative;
+            cursor: default;
+            transition: opacity 0.15s;
+            opacity: 0.75;
+        }
+        .line-bar:hover { opacity: 1; }
+        .line-bar[title]:hover::after {
+            content: attr(title);
+            position: absolute;
+            bottom: calc(100% + 6px);
+            left: 50%;
+            transform: translateX(-50%);
+            background: var(--surface-hover);
+            border: 1px solid var(--border);
+            color: var(--text);
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            white-space: nowrap;
+            pointer-events: none;
+            z-index: 10;
+        }
+
+        /* Theme cards */
+        .theme-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+            gap: 10px;
+        }
+        .theme-card {
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 12px 14px;
+            transition: border-color 0.15s;
+        }
+        .theme-card:hover { border-color: var(--accent); }
+        .theme-card .theme-name {
+            font-size: 13px;
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+        .theme-card .theme-count {
+            font-size: 20px;
+            font-weight: 700;
+            color: var(--accent);
+            font-variant-numeric: tabular-nums;
+        }
+        .theme-card .theme-examples {
+            font-size: 11px;
+            color: var(--text-muted);
+            margin-top: 4px;
+            line-height: 1.5;
+        }
+
+        /* Source donut placeholder */
+        .source-breakdown {
+            display: flex;
+            gap: 16px;
+            align-items: center;
+        }
+        .source-ring {
+            width: 80px;
+            height: 80px;
+            flex-shrink: 0;
+        }
+        .source-legend {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            font-size: 13px;
+        }
+        .source-legend-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .source-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            flex-shrink: 0;
+        }
+        .source-legend-count {
+            color: var(--text-muted);
+            font-size: 12px;
+            margin-left: 4px;
+        }
+
+        .empty { color: var(--text-muted); font-size: 13px; text-align: center; padding: 24px 0; }
+
+    </style>
+    <script>
+        (function(){
+            var t = null; try { t = localStorage.getItem('timeline-theme'); } catch(e) {}
+            if (t) document.documentElement.setAttribute('data-theme', t);
+        })();
+    </script>
+</head>
+<body>
+
+{% include '_nav.html' %}
+
+<div class="page">
+
+    <div class="page-header">
+        <div>
+            <h2>Usage Analytics</h2>
+            <div class="subtitle">Agent usage patterns, performance metrics, and query insights</div>
+        </div>
+    </div>
+
+    <!-- Summary stats -->
+    <div class="stat-row">
+        <div class="stat-card">
+            <div class="label">Total Queries</div>
+            <div class="value">{{ total }}</div>
+            <div class="sub">all time</div>
+        </div>
+        <div class="stat-card">
+            <div class="label">Last 7 Days</div>
+            <div class="value">{{ total_7d }}</div>
+            <div class="sub">recent activity</div>
+        </div>
+        <div class="stat-card">
+            <div class="label">Unique Users</div>
+            <div class="value">{{ top_users | length }}</div>
+            <div class="sub">distinct accounts</div>
+        </div>
+        <div class="stat-card">
+            <div class="label">Avg Response</div>
+            <div class="value success">{{ avg_response }}s</div>
+            <div class="sub">excl. errors</div>
+        </div>
+        <div class="stat-card">
+            <div class="label">Error Rate</div>
+            <div class="value {% if error_rate > 10 %}error{% elif error_rate > 5 %}warning{% else %}success{% endif %}">{{ error_rate }}%</div>
+            <div class="sub">{{ total_errors }} total errors</div>
+        </div>
+        <div class="stat-card">
+            <div class="label">Suggestions Used</div>
+            <div class="value">{{ sources.get('suggested', 0) }}</div>
+            <div class="sub">
+                {% if total > 0 %}
+                    {{ ((sources.get('suggested', 0) / total) * 100) | round(0) | int }}% of all queries
+                {% else %}
+                    no data yet
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Daily activity -->
+    <div class="card">
+        <h3>Daily Activity — Last 30 Days</h3>
+        {% if daily %}
+        {% set max_day = daily | map(attribute='queries') | max %}
+        <div class="daily-chart">
+            {% for d in daily %}
+            <div class="day-bar"
+                 style="height: {{ ((d.queries / max_day) * 100) | round(0) | int }}%"
+                 title="{{ d.day }}: {{ d.queries }} quer{{ 'y' if d.queries == 1 else 'ies' }}">
+            </div>
+            {% endfor %}
+        </div>
+        <div class="chart-axis">
+            <span>{{ daily[0].day }}</span>
+            <span>{{ daily[-1].day }}</span>
+        </div>
+        {% else %}
+        <div class="empty">No activity in the last 30 days</div>
+        {% endif %}
+    </div>
+
+    <div class="grid-2">
+        <!-- Response time trend -->
+        <div class="card">
+            <h3>Response Time Trend</h3>
+            {% if response_trend %}
+            {% set max_rt = response_trend | map(attribute='avg_secs') | max %}
+            {% if max_rt > 0 %}
+            <div class="line-chart">
+                {% for d in response_trend %}
+                <div class="line-bar"
+                     style="height: {{ ((d.avg_secs / max_rt) * 100) | round(0) | int }}%; background: var(--success);"
+                     title="{{ d.day }}: {{ d.avg_secs }}s avg ({{ d.queries }} queries)">
+                </div>
+                {% endfor %}
+            </div>
+            <div class="chart-axis">
+                <span>{{ response_trend[0].day }}</span>
+                <span>{{ response_trend[-1].day }}</span>
+            </div>
+            {% else %}
+            <div class="empty">All response times are 0</div>
+            {% endif %}
+            {% else %}
+            <div class="empty">No data yet</div>
+            {% endif %}
+        </div>
+
+        <!-- Peak hours heatmap -->
+        <div class="card">
+            <h3>Peak Usage Hours (Local Time)</h3>
+            {% if hourly %}
+            {% set max_h = hourly | map(attribute='queries') | max %}
+            <div class="hourly-grid">
+                {% for h in hourly %}
+                {% set intensity = ((h.queries / max_h) if max_h > 0 else 0) %}
+                <div class="hour-cell"
+                     style="background: rgba(108, 99, 255, {{ (intensity * 0.8 + 0.05) | round(2) }});"
+                     title="{{ '%02d' | format(h.hour) }}:00 — {{ h.queries }} quer{{ 'y' if h.queries == 1 else 'ies' }}">
+                </div>
+                {% endfor %}
+            </div>
+            <div class="hour-labels">
+                {% for h in hourly %}
+                {% if h.hour % 3 == 0 %}
+                <span>{{ '%02d' | format(h.hour) }}</span>
+                {% else %}
+                <span></span>
+                {% endif %}
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="empty">No data yet</div>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="grid-2">
+        <!-- Top users -->
+        <div class="card">
+            <h3>Top Users</h3>
+            {% if top_users %}
+            {% set max_q = top_users[0].queries %}
+            <div class="bar-chart">
+                {% for u in top_users[:10] %}
+                <div class="bar-row">
+                    <span class="bar-label" title="{{ u.user_email }}">{{ u.user_name }}</span>
+                    <div class="bar-track">
+                        <div class="bar-fill" style="width: {{ ((u.queries / max_q) * 100) | round(0) | int }}%"></div>
+                    </div>
+                    <span class="bar-count">{{ u.queries }}</span>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="empty">No data yet</div>
+            {% endif %}
+        </div>
+
+        <!-- Query source breakdown -->
+        <div class="card">
+            <h3>Query Sources</h3>
+            {% set typed = sources.get('typed', 0) %}
+            {% set suggested = sources.get('suggested', 0) %}
+            {% set source_total = typed + suggested %}
+            {% if source_total > 0 %}
+            <div class="source-breakdown">
+                <svg class="source-ring" viewBox="0 0 36 36">
+                    {% set suggested_pct = (suggested / source_total * 100) | round(1) %}
+                    {% set typed_pct = 100 - suggested_pct %}
+                    <circle cx="18" cy="18" r="14" fill="none" stroke="var(--border)" stroke-width="4"/>
+                    <circle cx="18" cy="18" r="14" fill="none"
+                            stroke="var(--accent)" stroke-width="4"
+                            stroke-dasharray="{{ suggested_pct * 0.88 }} {{ 88 - suggested_pct * 0.88 }}"
+                            stroke-dashoffset="22"
+                            stroke-linecap="round"/>
+                    <circle cx="18" cy="18" r="14" fill="none"
+                            stroke="var(--text-muted)" stroke-width="4"
+                            stroke-dasharray="{{ typed_pct * 0.88 }} {{ 88 - typed_pct * 0.88 }}"
+                            stroke-dashoffset="{{ 22 - suggested_pct * 0.88 }}"
+                            stroke-linecap="round"
+                            opacity="0.5"/>
+                </svg>
+                <div class="source-legend">
+                    <div class="source-legend-item">
+                        <span class="source-dot" style="background: var(--accent)"></span>
+                        Suggestion chips <span class="source-legend-count">{{ suggested }} ({{ suggested_pct | round(0) | int }}%)</span>
+                    </div>
+                    <div class="source-legend-item">
+                        <span class="source-dot" style="background: var(--text-muted); opacity: 0.5"></span>
+                        Typed queries <span class="source-legend-count">{{ typed }} ({{ typed_pct | round(0) | int }}%)</span>
+                    </div>
+                </div>
+            </div>
+            {% else %}
+            <div class="empty">No data yet</div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Query themes (AI-generated) -->
+    <div class="card">
+        <h3>
+            Query Themes
+            <button class="generate-btn" id="generateThemesBtn" onclick="generateThemes()" title="Uses AI to cluster queries into themes">
+                {% if query_themes %}Refresh themes{% else %}Generate themes{% endif %}
+            </button>
+        </h3>
+        <div id="themesContainer">
+            {% if query_themes %}
+            <div class="theme-grid">
+                {% for t in query_themes %}
+                <div class="theme-card">
+                    <div class="theme-name">{{ t.theme }}</div>
+                    <div class="theme-count">{{ t.count }}</div>
+                    {% if t.examples %}
+                    <div class="theme-examples">{{ t.examples }}</div>
+                    {% endif %}
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="empty" id="themesEmpty">
+                Click "Generate themes" to use AI to cluster your {{ total }} queries into meaningful categories.
+                <br><span style="font-size:11px; opacity:0.7;">Uses one Claude API call. Results are cached for 6 hours.</span>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Error rate trend -->
+    {% if error_trend %}
+    <div class="card">
+        <h3>Error Rate — Last 30 Days</h3>
+        {% set max_et = error_trend | map(attribute='total') | max %}
+        {% if max_et > 0 %}
+        <div class="daily-chart" style="height:60px;">
+            {% for d in error_trend %}
+            {% set err_pct = (d.errors / d.total * 100) if d.total > 0 else 0 %}
+            <div class="day-bar"
+                 style="height: {{ ((d.total / max_et) * 100) | round(0) | int }}%;
+                        background: {% if err_pct > 20 %}var(--error){% elif err_pct > 5 %}var(--warning){% else %}var(--success){% endif %};"
+                 title="{{ d.day }}: {{ d.errors }}/{{ d.total }} errors ({{ err_pct | round(0) | int }}%)">
+            </div>
+            {% endfor %}
+        </div>
+        <div class="chart-axis">
+            <span>{{ error_trend[0].day }}</span>
+            <span>{{ error_trend[-1].day }}</span>
+        </div>
+        {% endif %}
+    </div>
+    {% endif %}
+
+    <!-- Page traffic -->
+    <div class="card">
+        <h3>Page Traffic</h3>
+        {% if page_popularity %}
+        <div style="display:flex;gap:24px;margin-bottom:16px;">
+            <div>
+                <span style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;">Total Views</span>
+                <div style="font-size:22px;font-weight:700;color:var(--accent);font-variant-numeric:tabular-nums;">{{ total_page_views }}</div>
+            </div>
+            <div>
+                <span style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;">Last 7 Days</span>
+                <div style="font-size:22px;font-weight:700;color:var(--accent);font-variant-numeric:tabular-nums;">{{ page_views_7d }}</div>
+            </div>
+        </div>
+        <div class="grid-2" style="margin-bottom:0;">
+            <!-- Page popularity -->
+            <div>
+                <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:10px;">Pages by Popularity</div>
+                {% set max_pv = page_popularity[0].views %}
+                <div class="bar-chart">
+                    {% for p in page_popularity %}
+                    <div class="bar-row">
+                        <span class="bar-label" style="text-transform:capitalize;">{{ p.page }}</span>
+                        <div class="bar-track">
+                            <div class="bar-fill" style="width: {{ ((p.views / max_pv) * 100) | round(0) | int }}%; background: var(--success);"></div>
+                        </div>
+                        <span class="bar-count">{{ p.views }}</span>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            <!-- Page views by user -->
+            <div>
+                <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:10px;">Most Active Users</div>
+                {% if page_views_by_user %}
+                {% set max_uv = page_views_by_user[0].views %}
+                <div class="bar-chart">
+                    {% for u in page_views_by_user %}
+                    <div class="bar-row">
+                        <span class="bar-label">{{ u.user_name }}</span>
+                        <div class="bar-track">
+                            <div class="bar-fill" style="width: {{ ((u.views / max_uv) * 100) | round(0) | int }}%; background: var(--success);"></div>
+                        </div>
+                        <span class="bar-count" title="{{ u.pages_used }} pages">{{ u.views }}</span>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="empty">No data yet</div>
+                {% endif %}
+            </div>
+        </div>
+        {% if daily_page_views %}
+        <div style="margin-top:16px;">
+            <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:10px;">Daily Page Views — Last 30 Days</div>
+            {% set max_dpv = daily_page_views | map(attribute='views') | max %}
+            <div class="daily-chart" style="height:60px;">
+                {% for d in daily_page_views %}
+                <div class="day-bar"
+                     style="height: {{ ((d.views / max_dpv) * 100) | round(0) | int }}%; background: var(--success);"
+                     title="{{ d.day }}: {{ d.views }} view{{ 's' if d.views != 1 else '' }}">
+                </div>
+                {% endfor %}
+            </div>
+            <div class="chart-axis">
+                <span>{{ daily_page_views[0].day }}</span>
+                <span>{{ daily_page_views[-1].day }}</span>
+            </div>
+        </div>
+        {% endif %}
+        {% else %}
+        <div class="empty">No page view data yet — views will appear here as users navigate the app</div>
+        {% endif %}
+    </div>
+
+    <!-- User detail table -->
+    <div class="card">
+        <h3>User Breakdown</h3>
+        {% if top_users %}
+        <table>
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>Email</th>
+                    <th>Queries</th>
+                    <th>Avg Response</th>
+                    <th>Errors</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for u in top_users %}
+                <tr>
+                    <td>{{ u.user_name }}</td>
+                    <td style="color:var(--text-muted)">{{ u.user_email }}</td>
+                    <td>{{ u.queries }}</td>
+                    <td>{{ u.avg_secs }}s</td>
+                    <td>
+                        {% if u.errors > 0 %}
+                        <span class="badge badge-error">{{ u.errors }}</span>
+                        {% else %}
+                        <span style="color:var(--text-muted)">0</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <div class="empty">No data yet — queries will appear here once users start chatting</div>
+        {% endif %}
+    </div>
+
+    <!-- Recent activity -->
+    <div class="card">
+        <h3>Recent Activity</h3>
+        {% if recent %}
+        <table>
+            <thead>
+                <tr>
+                    <th>When</th>
+                    <th>User</th>
+                    <th>Query</th>
+                    <th>Source</th>
+                    <th>Time</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for r in recent %}
+                <tr>
+                    <td style="color:var(--text-muted);white-space:nowrap;">{{ r.timestamp[:16].replace('T', ' ') }}</td>
+                    <td style="white-space:nowrap;">{{ r.user_name }}</td>
+                    <td style="max-width:500px;">
+                        {% if r.query_text|length > 80 %}
+                        <span class="query-preview" onclick="this.style.display='none';this.nextElementSibling.style.display='block'" style="cursor:pointer;">{{ r.query_text[:80] }}… <span style="color:var(--accent);font-size:11px;">show more</span></span>
+                        <span class="query-full" style="display:none;white-space:pre-wrap;word-break:break-word;" onclick="this.style.display='none';this.previousElementSibling.style.display='inline'">{{ r.query_text }} <span style="color:var(--accent);font-size:11px;">show less</span></span>
+                        {% else %}
+                        {{ r.query_text }}
+                        {% endif %}
+                    </td>
+                    <td>
+                        <span class="badge {{ 'badge-suggested' if r.source == 'suggested' else 'badge-typed' }}">
+                            {{ r.source }}
+                        </span>
+                    </td>
+                    <td style="color:var(--text-muted);white-space:nowrap;">
+                        {% if r.errored %}
+                        <span class="badge badge-error">error</span>
+                        {% else %}
+                        {{ r.secs }}s
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <div class="empty">No activity yet</div>
+        {% endif %}
+    </div>
+
+</div>
+
+<script>
+async function generateThemes() {
+    var btn = document.getElementById('generateThemesBtn');
+    var container = document.getElementById('themesContainer');
+    btn.textContent = 'Generating...';
+    btn.classList.add('loading');
+
+    try {
+        var resp = await fetch('/api/analytics/themes', { method: 'POST' });
+        var data = await resp.json();
+        if (!data.ok) {
+            alert('Failed: ' + (data.error || 'unknown error'));
+            btn.textContent = 'Retry';
+            btn.classList.remove('loading');
+            return;
+        }
+
+        var themes = data.themes || [];
+        if (themes.length === 0) {
+            container.innerHTML = '<div class="empty">No queries to analyse yet.</div>';
+            btn.textContent = 'Generate themes';
+            btn.classList.remove('loading');
+            return;
+        }
+
+        var html = '<div class="theme-grid">';
+        themes.forEach(function(t) {
+            html += '<div class="theme-card">';
+            html += '<div class="theme-name">' + esc(t.theme_name) + '</div>';
+            html += '<div class="theme-count">' + t.query_count + '</div>';
+            if (t.example_queries) {
+                html += '<div class="theme-examples">' + esc(t.example_queries) + '</div>';
+            }
+            html += '</div>';
+        });
+        html += '</div>';
+        container.innerHTML = html;
+        btn.textContent = 'Refresh themes';
+        btn.classList.remove('loading');
+    } catch(e) {
+        alert('Network error: ' + e.message);
+        btn.textContent = 'Retry';
+        btn.classList.remove('loading');
+    }
+}
+
+function esc(s) {
+    if (!s) return '';
+    var d = document.createElement('div');
+    d.appendChild(document.createTextNode(s));
+    return d.innerHTML;
+}
+</script>
+</body>
+</html>

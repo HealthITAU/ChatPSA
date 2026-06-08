@@ -1,0 +1,751 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Timeline — {{ app_name }}</title>
+    <link rel="icon" type="image/x-icon" href="/static/favicon.ico">
+    <link rel="icon" type="image/png" sizes="32x32" href="/static/favicon-32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="/static/favicon-16.png">
+    <link rel="apple-touch-icon" sizes="180x180" href="/static/apple-touch-icon.png">
+    <style>
+        /* ── Dark theme (default) ──────────────────────────────────────────── */
+        :root, [data-theme="dark"] {
+            --bg: #0f1117;
+            --surface: #1a1d27;
+            --surface-hover: #242736;
+            --border: #2e3142;
+            --text: #e1e4ed;
+            --text-muted: #8b8fa3;
+            --accent: #6c63ff;
+            --success: #34d399;
+            --warning: #fbbf24;
+            --error: #f87171;
+            --week-bg: transparent;
+            --week-line: var(--border);
+        }
+
+        /* ── Light theme ───────────────────────────────────────────────────── */
+        [data-theme="light"] {
+            --bg: #f5f6f8;
+            --surface: #ffffff;
+            --surface-hover: #f0f1f4;
+            --border: #dcdee4;
+            --text: #1a1d27;
+            --text-muted: #6b7084;
+            --accent: #5b52e0;
+            --success: #16a369;
+            --warning: #d97706;
+            --error: #dc2626;
+            --week-bg: transparent;
+            --week-line: #c8cad2;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            transition: background 0.2s, color 0.2s;
+        }
+
+        /* ── Layout ─────────────────────────────────────────────────────────── */
+        .page { padding: 24px 40px; max-width: 1600px; margin: 0 auto; }
+
+        /* ── Filter bar ─────────────────────────────────────────────────────── */
+        .filter-bar {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 24px;
+            flex-wrap: wrap;
+        }
+        .filter-bar input,
+        .filter-bar select {
+            padding: 7px 12px;
+            border-radius: 6px;
+            border: 1px solid var(--border);
+            background: var(--surface);
+            color: var(--text);
+            font-size: 13px;
+            outline: none;
+            transition: border-color 0.15s;
+        }
+        .filter-bar input:focus,
+        .filter-bar select:focus {
+            border-color: var(--accent);
+        }
+        .filter-bar input { min-width: 180px; }
+        .filter-bar label {
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            color: var(--text-muted);
+        }
+        .event-count {
+            margin-left: auto;
+            font-size: 12px;
+            color: var(--text-muted);
+        }
+
+        /* ── Month groups ───────────────────────────────────────────────────── */
+        .month-group { margin-bottom: 32px; }
+        .month-label {
+            font-size: 13px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            color: var(--accent);
+            padding-bottom: 10px;
+            border-bottom: 1px solid var(--border);
+            margin-bottom: 14px;
+        }
+
+        /* ── Card grid ─────────────────────────────────────────────────────── */
+        .card-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
+            gap: 10px;
+        }
+        .card-grid .week-divider {
+            grid-column: 1 / -1;
+        }
+
+        /* ── Week separators ────────────────────────────────────────────────── */
+        .week-divider {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin: 14px 0 10px;
+        }
+        .week-divider::before,
+        .week-divider::after {
+            content: '';
+            flex: 1;
+            height: 1px;
+            background: var(--week-line);
+        }
+        .week-label {
+            font-size: 10px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            color: var(--text-muted);
+            white-space: nowrap;
+            padding: 2px 10px;
+            border-radius: 10px;
+            background: var(--week-bg);
+        }
+
+        /* ── Event cards ────────────────────────────────────────────────────── */
+        .event-card {
+            display: grid;
+            grid-template-columns: 72px 1fr auto;
+            gap: 12px;
+            align-items: start;
+            padding: 14px 16px;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            transition: border-color 0.15s, background 0.2s;
+        }
+        .event-card:hover { border-color: var(--accent); }
+
+        .event-date {
+            font-size: 20px;
+            font-weight: 700;
+            line-height: 1.1;
+            color: var(--text);
+        }
+        .event-date .day-name {
+            font-size: 11px;
+            font-weight: 500;
+            color: var(--text-muted);
+            display: block;
+            margin-top: 2px;
+        }
+
+        .event-body { min-width: 0; }
+        .event-company {
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text);
+            margin-bottom: 2px;
+        }
+        .event-summary {
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--text);
+            margin-bottom: 6px;
+            line-height: 1.35;
+        }
+        .event-summary a {
+            color: var(--accent);
+            text-decoration: none;
+            font-weight: 600;
+        }
+        .event-summary a:hover { text-decoration: underline; }
+        .event-board {
+            display: inline-block;
+            font-size: 10px;
+            font-weight: 600;
+            color: var(--text-muted);
+            background: var(--surface-hover);
+            padding: 1px 8px;
+            border-radius: 10px;
+            margin-bottom: 4px;
+            letter-spacing: 0.02em;
+        }
+        .event-description {
+            font-size: 13px;
+            color: var(--text);
+            line-height: 1.4;
+            word-break: break-word;
+            margin-bottom: 4px;
+        }
+        .event-description.is-raw {
+            color: var(--text-muted);
+            font-style: italic;
+        }
+        .ai-toggle {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            background: none;
+            border: none;
+            cursor: pointer;
+            padding: 0;
+            vertical-align: middle;
+            color: var(--accent);
+            font-size: 12px;
+            opacity: 0.7;
+            transition: opacity 0.15s;
+        }
+        .ai-toggle:hover { opacity: 1; }
+        .ai-toggle svg { width: 14px; height: 14px; }
+        .ai-toggle .toggle-label {
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            font-weight: 600;
+        }
+        .event-meta {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            margin-top: 4px;
+        }
+        .member-badge {
+            font-size: 11px;
+            color: var(--text-muted);
+        }
+        .confidence-badge {
+            display: inline-block;
+            padding: 2px 7px;
+            border-radius: 10px;
+            font-size: 10px;
+            font-weight: 600;
+            letter-spacing: 0.02em;
+        }
+        .confidence-confirmed {
+            background: rgba(52, 211, 153, 0.15);
+            color: var(--success);
+        }
+        .confidence-likely {
+            background: rgba(251, 191, 36, 0.15);
+            color: var(--warning);
+        }
+        .confidence-tentative {
+            background: rgba(248, 113, 113, 0.15);
+            color: var(--error);
+        }
+
+        .event-actions {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            align-items: flex-end;
+        }
+        .btn-dismiss {
+            padding: 4px 10px;
+            border-radius: 4px;
+            border: 1px solid var(--border);
+            background: transparent;
+            color: var(--text-muted);
+            font-size: 11px;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+        .btn-dismiss:hover {
+            border-color: var(--error);
+            color: var(--error);
+        }
+        .btn-generate-ai {
+            padding: 4px 10px;
+            border-radius: 4px;
+            border: 1px solid var(--border);
+            background: transparent;
+            color: var(--accent);
+            font-size: 11px;
+            cursor: pointer;
+            transition: all 0.15s;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+        }
+        .btn-generate-ai:hover {
+            border-color: var(--accent);
+            background: rgba(108, 99, 255, 0.08);
+        }
+        .btn-generate-ai:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        .btn-generate-ai svg {
+            width: 12px;
+            height: 12px;
+        }
+
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* ── Empty state ────────────────────────────────────────────────────── */
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: var(--text-muted);
+        }
+        .empty-state svg {
+            width: 48px;
+            height: 48px;
+            margin-bottom: 16px;
+            opacity: 0.4;
+        }
+        .empty-state h3 {
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: var(--text);
+        }
+        .empty-state p { font-size: 13px; }
+
+        /* ── Loading ────────────────────────────────────────────────────────── */
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: var(--text-muted);
+            font-size: 13px;
+        }
+
+        @media (max-width: 640px) {
+            .page { padding: 16px; }
+            .card-grid { grid-template-columns: 1fr; }
+            .event-card { grid-template-columns: 56px 1fr; }
+            .event-actions { grid-column: 2; flex-direction: row; }
+            .filter-bar { flex-direction: column; align-items: stretch; }
+            .event-count { margin-left: 0; }
+        }
+    </style>
+    <script>
+        (function(){
+            var t = null; try { t = localStorage.getItem('timeline-theme'); } catch(e) {}
+            if (t) document.documentElement.setAttribute('data-theme', t);
+        })();
+    </script>
+</head>
+<body>
+
+{% include '_nav.html' %}
+
+<div class="page">
+    <!-- Filter bar -->
+    <div class="filter-bar">
+        <label for="searchFilter">Search</label>
+        <input type="text" id="searchFilter" placeholder="Search cards..." autocomplete="off">
+        <label for="companyFilter">Company</label>
+        <input type="text" id="companyFilter" placeholder="Search company..." autocomplete="off">
+        <label for="fromFilter">From</label>
+        <input type="date" id="fromFilter">
+        <label for="toFilter">To</label>
+        <input type="date" id="toFilter">
+        <label for="boardFilter">Board</label>
+        <select id="boardFilter">
+            <option value="">All boards</option>
+        </select>
+        <label for="confidenceFilter">Confidence</label>
+        <select id="confidenceFilter">
+            <option value="confirmed" selected>Confirmed only</option>
+            <option value="confirmed,likely">Confirmed + Likely</option>
+            <option value="likely">Likely only</option>
+            <option value="">All</option>
+        </select>
+        <span class="event-count" id="eventCount"></span>
+        <a href="/timeline/debug" style="font-size:11px;color:var(--text-muted);text-decoration:none;margin-left:8px;" onmouseover="this.style.color='var(--accent)'" onmouseout="this.style.color='var(--text-muted)'">Debug</a>
+    </div>
+
+    <div id="timelineContainer">
+        <div class="loading">Loading timeline events...</div>
+    </div>
+</div>
+
+<script>
+(function() {
+    var CW_TICKET_URL = {{ cw_ticket_url | tojson }};
+    var AI_SUMMARIES_ENABLED = {{ ai_summaries_enabled | tojson }};
+    var events = [];
+    var debounceTimer = null;
+
+    // ── ISO week number helper ───────────────────────────────────────────
+    function getISOWeek(d) {
+        var date = new Date(d.getTime());
+        date.setHours(0, 0, 0, 0);
+        date.setDate(date.getDate() + 3 - ((date.getDay() + 6) % 7));
+        var week1 = new Date(date.getFullYear(), 0, 4);
+        return 1 + Math.round(((date.getTime() - week1.getTime()) / 86400000 - 3 + ((week1.getDay() + 6) % 7)) / 7);
+    }
+
+    function getWeekStart(d) {
+        var date = new Date(d.getTime());
+        var day = date.getDay();
+        var diff = (day === 0 ? -6 : 1) - day; // Monday as week start
+        date.setDate(date.getDate() + diff);
+        return date;
+    }
+
+    function formatWeekLabel(d) {
+        var ws = getWeekStart(d);
+        var we = new Date(ws.getTime());
+        we.setDate(we.getDate() + 6);
+        var monthNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+        var label = 'Week ' + getISOWeek(d) + ' — ' +
+            ws.getDate() + ' ' + monthNames[ws.getMonth()];
+        if (ws.getMonth() !== we.getMonth()) {
+            label += ' to ' + we.getDate() + ' ' + monthNames[we.getMonth()];
+        } else {
+            label += '–' + we.getDate();
+        }
+        return label;
+    }
+
+    // ── Date range defaults ──────────────────────────────────────────────
+    var today = new Date();
+    var threeMonths = new Date(today);
+    threeMonths.setMonth(threeMonths.getMonth() + 3);
+    document.getElementById('fromFilter').value = formatDateInput(today);
+    document.getElementById('toFilter').value = formatDateInput(threeMonths);
+
+    function formatDateInput(d) {
+        return d.getFullYear() + '-' +
+            String(d.getMonth() + 1).padStart(2, '0') + '-' +
+            String(d.getDate()).padStart(2, '0');
+    }
+
+    function fetchEvents() {
+        var params = new URLSearchParams();
+        var company = document.getElementById('companyFilter').value.trim();
+        var from = document.getElementById('fromFilter').value;
+        var to = document.getElementById('toFilter').value;
+        var board = document.getElementById('boardFilter').value;
+        var confidence = document.getElementById('confidenceFilter').value;
+        if (company) params.set('company', company);
+        if (from) params.set('from', from);
+        if (to) params.set('to', to);
+        if (board) params.set('board', board);
+        if (confidence) params.set('confidence', confidence);
+
+        fetch('/api/timeline?' + params.toString())
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                events = data.events || [];
+                renderTimeline();
+                populateDropdowns();
+            })
+            .catch(function(err) {
+                document.getElementById('timelineContainer').innerHTML =
+                    '<div class="empty-state"><p>Failed to load timeline: ' + err.message + '</p></div>';
+            });
+    }
+
+    function populateDropdowns() {
+        // Board dropdown
+        var boardSel = document.getElementById('boardFilter');
+        var curBoard = boardSel.value;
+        if (!curBoard) {
+            var boards = {};
+            events.forEach(function(e) {
+                if (e.board_name) boards[e.board_name] = (boards[e.board_name] || 0) + 1;
+            });
+            boardSel.innerHTML = '<option value="">All boards</option>';
+            Object.keys(boards).sort().forEach(function(b) {
+                var opt = document.createElement('option');
+                opt.value = b;
+                opt.textContent = b + ' (' + boards[b] + ')';
+                boardSel.appendChild(opt);
+            });
+        }
+    }
+
+    function getFiltered() {
+        var q = document.getElementById('searchFilter').value.trim().toLowerCase();
+        if (!q) return events;
+        return events.filter(function(e) {
+            return (e.context_snippet && e.context_snippet.toLowerCase().indexOf(q) !== -1) ||
+                   (e.ticket_summary && e.ticket_summary.toLowerCase().indexOf(q) !== -1) ||
+                   (e.company_name && e.company_name.toLowerCase().indexOf(q) !== -1) ||
+                   (e.ai_description && e.ai_description.toLowerCase().indexOf(q) !== -1);
+        });
+    }
+
+    function renderTimeline() {
+        var container = document.getElementById('timelineContainer');
+        var filtered = getFiltered();
+
+        document.getElementById('eventCount').textContent =
+            filtered.length + ' event' + (filtered.length !== 1 ? 's' : '');
+
+        if (filtered.length === 0) {
+            container.innerHTML =
+                '<div class="empty-state">' +
+                '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">' +
+                '<rect x="3" y="4" width="18" height="18" rx="2"/>' +
+                '<path d="M16 2v4M8 2v4M3 10h18"/>' +
+                '</svg>' +
+                '<h3>No upcoming events</h3>' +
+                '<p>No future dates found in ticket notes matching your filters.</p>' +
+                '</div>';
+            return;
+        }
+
+        // Group by month
+        var groups = {};
+        var groupOrder = [];
+        filtered.forEach(function(e) {
+            var d = new Date(e.parsed_date + 'T00:00:00');
+            var key = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+            if (!groups[key]) {
+                groups[key] = [];
+                groupOrder.push(key);
+            }
+            groups[key].push(e);
+        });
+
+        var monthNames = ['January','February','March','April','May','June',
+                          'July','August','September','October','November','December'];
+
+        var html = '';
+        groupOrder.forEach(function(key) {
+            var parts = key.split('-');
+            var label = monthNames[parseInt(parts[1]) - 1] + ' ' + parts[0];
+            html += '<div class="month-group">';
+            html += '<div class="month-label">' + label + '</div>';
+            html += '<div class="card-grid">';
+
+            var lastWeek = -1;
+            groups[key].forEach(function(e) {
+                var d = new Date(e.parsed_date + 'T00:00:00');
+                var week = getISOWeek(d);
+                var dayNum = d.getDate();
+                var dayNames = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+                var dayName = dayNames[d.getDay()];
+
+                // Insert week divider when the week changes
+                if (week !== lastWeek) {
+                    if (lastWeek !== -1) {
+                        // Not the first event in this month — add divider
+                        html += '<div class="week-divider"><span class="week-label">' +
+                            formatWeekLabel(d) + '</span></div>';
+                    } else {
+                        // First event — show week label inline
+                        html += '<div class="week-divider"><span class="week-label">' +
+                            formatWeekLabel(d) + '</span></div>';
+                    }
+                    lastWeek = week;
+                }
+
+                html += '<div class="event-card" data-id="' + e.id + '">';
+
+                // Date column
+                html += '<div class="event-date">' + dayNum +
+                    '<span class="day-name">' + dayName + '</span></div>';
+
+                // Body column
+                html += '<div class="event-body">';
+                html += '<div class="event-company">' + escHtml(e.company_name || 'Unknown') + '</div>';
+                if (e.board_name) {
+                    html += '<span class="event-board">' + escHtml(e.board_name) + '</span>';
+                }
+                html += '<div class="event-summary">';
+                if (e.ticket_id) {
+                    if (CW_TICKET_URL) {
+                        html += '<a href="' + CW_TICKET_URL +
+                            e.ticket_id + '" target="_blank" rel="noopener">#' +
+                            e.ticket_id + '</a>';
+                    } else {
+                        html += '#' + e.ticket_id;
+                    }
+                    html += ' — ';
+                }
+                html += escHtml(e.ticket_summary || '');
+                html += '</div>';
+
+                // Description: AI-generated (with sparkle + toggle) or raw context fallback
+                var hasAi = !!e.ai_description;
+                var hasCtx = !!e.context_snippet;
+                if (hasAi) {
+                    // AI description shown by default
+                    html += '<div class="event-description" id="desc-' + e.id + '">' +
+                        escHtml(e.ai_description) + '</div>';
+                    // Hidden raw context
+                    html += '<div class="event-description is-raw" id="ctx-' + e.id + '" style="display:none;">' +
+                        '"' + escHtml(e.context_snippet || '') + '"</div>';
+                    // Toggle button
+                    html += '<button class="ai-toggle" onclick="toggleDesc(' + e.id + ')" title="Toggle AI / raw context">' +
+                        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
+                        '<path d="M12 3l1.5 4.5H18l-3.5 2.5L16 15l-4-3-4 3 1.5-5L6 7.5h4.5z"/>' +
+                        '</svg>' +
+                        '<span class="toggle-label">Toggle AI summary</span>' +
+                        '</button>';
+                } else if (hasCtx) {
+                    // No AI description — show raw context as fallback
+                    html += '<div class="event-description is-raw">"' +
+                        escHtml(e.context_snippet) + '"</div>';
+                }
+
+                html += '<div class="event-meta">';
+                var conf = e.confidence || 'confirmed';
+                html += '<span class="confidence-badge confidence-' + conf + '">' +
+                    conf.charAt(0).toUpperCase() + conf.slice(1) + '</span>';
+                if (e.member_name) {
+                    html += '<span class="member-badge">' + escHtml(e.member_name) + '</span>';
+                }
+                html += '</div>';
+                html += '</div>';
+
+                // Actions column
+                html += '<div class="event-actions">';
+                if (!hasAi && AI_SUMMARIES_ENABLED) {
+                    html += '<button class="btn-generate-ai" id="gen-' + e.id + '" onclick="generateSingle(' + e.id + ', this)" title="Generate AI description">' +
+                        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
+                        '<path d="M12 3l1.5 4.5H18l-3.5 2.5L16 15l-4-3-4 3 1.5-5L6 7.5h4.5z"/>' +
+                        '</svg>Generate AI summary' +
+                        '</button>';
+                }
+                html += '<button class="btn-dismiss" onclick="dismissEvent(' + e.id + ', this)">Dismiss</button>';
+                html += '</div>';
+
+                html += '</div>';
+            });
+
+            html += '</div>'; // close card-grid
+            html += '</div>'; // close month-group
+        });
+
+        container.innerHTML = html;
+    }
+
+    function escHtml(s) {
+        if (!s) return '';
+        var div = document.createElement('div');
+        div.appendChild(document.createTextNode(s));
+        return div.innerHTML;
+    }
+
+    window.toggleDesc = function(id) {
+        var aiEl = document.getElementById('desc-' + id);
+        var ctxEl = document.getElementById('ctx-' + id);
+        if (!aiEl || !ctxEl) return;
+        var showingAi = aiEl.style.display !== 'none';
+        aiEl.style.display = showingAi ? 'none' : '';
+        ctxEl.style.display = showingAi ? '' : 'none';
+    };
+
+    window.generateSingle = function(eventId, btn) {
+        var origHtml = btn.innerHTML;
+        btn.disabled = true;
+        btn.innerHTML = '<svg style="width:12px;height:12px;animation:spin 1s linear infinite;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3l1.5 4.5H18l-3.5 2.5L16 15l-4-3-4 3 1.5-5L6 7.5h4.5z"/></svg>';
+        fetch('/api/timeline/' + eventId + '/generate-description', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            if (data.ok && data.description) {
+                // Update the event in our local data and re-render
+                for (var i = 0; i < events.length; i++) {
+                    if (events[i].id === eventId) {
+                        events[i].ai_description = data.description;
+                        break;
+                    }
+                }
+                renderTimeline();
+            } else {
+                btn.disabled = false;
+                btn.innerHTML = origHtml;
+                btn.title = 'Error: ' + (data.error || 'unknown');
+            }
+        })
+        .catch(function() {
+            btn.disabled = false;
+            btn.innerHTML = origHtml;
+        });
+    };
+
+    // Queued dismiss — card vanishes instantly, API calls sent sequentially
+    var dismissQueue = [];
+    var dismissRunning = false;
+
+    function processDismissQueue() {
+        if (dismissRunning || dismissQueue.length === 0) return;
+        dismissRunning = true;
+        var id = dismissQueue.shift();
+        fetch('/api/timeline/' + id + '/dismiss', { method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            if (data.ok === false) console.warn('Dismiss ' + id + ' failed server-side:', data.error);
+        })
+        .catch(function(err) {
+            console.warn('Dismiss ' + id + ' network error, will retry:', err);
+            dismissQueue.push(id); // Re-queue for retry
+        })
+        .finally(function() {
+            dismissRunning = false;
+            if (dismissQueue.length > 0) {
+                setTimeout(processDismissQueue, 500); // Small delay between calls
+            }
+        });
+    }
+
+    window.dismissEvent = function(id, btn) {
+        // Optimistic: remove from UI immediately
+        events = events.filter(function(e) { return e.id !== id; });
+        renderTimeline();
+        // Queue the API call
+        dismissQueue.push(id);
+        processDismissQueue();
+    };
+
+    // Wire up filters
+    document.getElementById('searchFilter').addEventListener('input', function() {
+        clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(renderTimeline, 300);
+    });
+    document.getElementById('companyFilter').addEventListener('input', function() {
+        clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(fetchEvents, 400);
+    });
+    document.getElementById('fromFilter').addEventListener('change', fetchEvents);
+    document.getElementById('toFilter').addEventListener('change', fetchEvents);
+    document.getElementById('boardFilter').addEventListener('change', fetchEvents);
+    document.getElementById('confidenceFilter').addEventListener('change', fetchEvents);
+
+    // Initial load
+    fetchEvents();
+})();
+</script>
+
+</body>
+</html>
