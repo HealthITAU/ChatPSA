@@ -218,6 +218,17 @@ Contributions are welcome — bug fixes, new integrations, UI improvements. Feel
 
 ---
 
+## Supporting the project
+
+:heart: the project and would like to show your support? Please consider donating to one of our favourite charities:
+- [Love Your Sister (Sam's 1000)](https://www.loveyoursister.org/makeadonation)
+- [Black Dog](https://donate.blackdoginstitute.org.au/)
+- [RedFrogs Australia](https://redfrogs.com.au/support/donate)
+
+Please let us know if you have donated because of this project!
+
+---
+
 ## Licence
 
 [GNU Affero General Public License v3.0](LICENSE) — free to use, modify, and self-host. If you run a modified version as a hosted service, you must publish your changes under the same licence.
