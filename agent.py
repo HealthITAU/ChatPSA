@@ -5,19 +5,18 @@ import os
 import re
 import time
 from datetime import datetime
-from functools import wraps
 
 from config import (APP_TZ, MAX_CONVERSATION_TURNS,
                     MAX_HISTORY_TOKENS, MAX_ROWS, MEMORIES_DB_PATH,
-                    get_tz_offset_sql, get_tz_label, get_tz_offset)
+                    get_tz_offset_sql, get_tz_label)
 from settings import get_setting, get_setting_int
 
 from db import (execute_sql, find_similar_examples, get_history,
-                get_sample_data, get_schema_description, log_usage,
+                get_sample_data, get_schema_description,
                 save_message, trim_history)
 from pins import add_pin, dismiss_pin, get_pins
 from memory_store import (MemoryLimitReached, MemoryValueRejected,
-                           build_memory_block, delete_memory,
+                           build_memory_block,
                            get_all_memories, update_memory, upsert_memory)
 
 try:
@@ -458,7 +457,7 @@ def build_system_prompt(schema, samples, today, user_email="anonymous", user_que
     static_prompt = static_prompt.replace("{CAPABILITIES_EXTRA}", capabilities_extra)
 
     schema_notes = (
-        f"## Important schema notes\n"
+        "## Important schema notes\n"
         f"- To find open tickets use `date_closed IS NULL` (there is no `closed_flag` column).\n"
         f"- The ticket due-date column is `required_date` (not `required_by`).\n"
         f"- The `companies` table uses `name` for the company name (not `company_name`). Always use `c.name AS company_name` when selecting from `companies`."
@@ -688,7 +687,6 @@ def _claude_call(client, system, messages, tools=None):
                 tools=tools if tools is not None else MEMORY_TOOLS,
             )
         except anthropic.APIStatusError as e:
-            last_error = e
             status = e.status_code
             if status in (429, 500, 502, 503, 529) and attempt < max_retries:
                 wait = (2 ** attempt) + 1  # 2s, 3s, 5s
@@ -704,7 +702,6 @@ def _claude_call(client, system, messages, tools=None):
                 error_detail=detail,
             ) from e
         except anthropic.APIConnectionError as e:
-            last_error = e
             if attempt < max_retries:
                 wait = (2 ** attempt) + 1
                 log.warning("Claude API connection error on attempt %d/%d — retrying in %ds",

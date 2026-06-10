@@ -102,7 +102,6 @@ def get_setting(key: str, default: str | None = None) -> str:
         # env var not in environment — fall through to DB
 
     # Normal mode: check DB cache
-    global _cache_ts
     if (time.monotonic() - _cache_ts) > _CACHE_TTL:
         _refresh_cache()
 
