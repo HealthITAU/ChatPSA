@@ -4,7 +4,7 @@ import time
 
 from config import is_cipp_enabled, is_duo_enabled, is_huntress_enabled, is_threatlocker_enabled, get_tz_offset_sql
 from db import get_db
-from settings import get_setting, get_setting_int, get_setting_list
+from settings import get_setting, get_setting_list
 
 log = logging.getLogger("chatpsa.insights")
 
@@ -266,7 +266,7 @@ def _run_insight_queries():
                     "severity": "high",
                     "chips": [
                         f"Which users at {r['company_name']} are in Duo bypass mode?",
-                        f"Show me all Duo bypass users across all clients",
+                        "Show me all Duo bypass users across all clients",
                     ],
                 })
         except Exception:
@@ -345,7 +345,7 @@ def _run_insight_queries():
                     "severity": "high" if r["critical_cnt"] > 0 else "medium",
                     "chips": [
                         f"What Huntress incidents are open for {r['company_name']}?",
-                        f"Show me all unresolved Huntress incidents",
+                        "Show me all unresolved Huntress incidents",
                     ],
                 })
         except Exception:
@@ -376,7 +376,7 @@ def _run_insight_queries():
                     "severity": "high" if pct >= 50 else "medium",
                     "chips": [
                         f"Which {r['company_name']} computers aren\'t in ThreatLocker Secure mode?",
-                        f"Show me all ThreatLocker endpoints not in Secure mode",
+                        "Show me all ThreatLocker endpoints not in Secure mode",
                     ],
                 })
         except Exception:
@@ -413,7 +413,7 @@ def _run_insight_queries():
                     "severity": "high" if ratio >= 3.0 or r["denies_today"] >= 100 else "medium",
                     "chips": [
                         f"Which {r['company_name']} computers have ThreatLocker denials today?",
-                        f"Show me all ThreatLocker deny activity across clients",
+                        "Show me all ThreatLocker deny activity across clients",
                     ],
                 })
         except Exception:

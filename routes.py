@@ -9,18 +9,18 @@ import sys
 import time
 from datetime import datetime
 
-from flask import (Blueprint, jsonify, redirect, render_template,
+from flask import (Blueprint, jsonify, render_template,
                    request, session, url_for)
 
 from agent import chat, ClaudeAPIError
 from memory_store import upsert_memory, update_memory, delete_memory
-from auth import api_login_required, check_all_features, check_feature_access, feature_required, login_required
+from auth import api_login_required, check_all_features, feature_required, login_required
 from config import (APP_DIR, is_azure_enabled,
                     is_cipp_enabled, is_duo_enabled,
                     is_huntress_enabled, is_threatlocker_enabled,
                     DB_PATH, MEMORIES_DB_PATH, get_tz_offset_sql)
-from settings import get_setting, get_setting_int
-from db import (get_db, get_db_readonly, get_schema_description, store_example,
+from settings import get_setting
+from db import (get_db, get_db_readonly, store_example,
                 _get_conv_db, _ensure_usage_table, get_query_themes,
                 save_query_themes, log_page_view)
 from insights import get_insights, get_weekly_ticket_volume
@@ -2344,7 +2344,6 @@ def api_timeline_generate_single(event_id):
     """Generate an AI description for a single timeline event."""
     if get_setting("timeline_ai_summaries", "true").lower() != "true":
         return jsonify({"ok": False, "error": "AI summaries are disabled in settings"}), 400
-    from parse_timeline import generate_single_ai_description
     # This function does a SELECT then an UPDATE + commit.
     # The SELECT (read) works fine under WAL, but the UPDATE (write) can
     # fail with "database is locked" if a sync is running.  We split the

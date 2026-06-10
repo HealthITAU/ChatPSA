@@ -97,8 +97,7 @@ from memory_store import (
     MemoryValueRejected,
     upsert_memory,
     get_all_memories,
-    get_memory_by_id,
-    update_memory,
+        update_memory,
     delete_memory,
 )
 

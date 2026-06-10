@@ -8,7 +8,7 @@ import sqlite3
 import time
 from datetime import datetime
 
-from config import (APP_DIR, DB_PATH, HELPDESK_BOARD, MAX_ROWS,
+from config import (DB_PATH, HELPDESK_BOARD, MAX_ROWS,
                     MEMORIES_DB_PATH, get_tz_offset_sql)
 
 log = logging.getLogger("chatpsa.db")

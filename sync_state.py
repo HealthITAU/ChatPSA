@@ -25,7 +25,6 @@ Usage in a sync script:
         raise
 """
 
-import sqlite3
 import time
 from datetime import datetime, timezone
 

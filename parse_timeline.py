@@ -19,8 +19,7 @@ import logging
 import os
 import re
 import sqlite3
-import sys
-from datetime import date, datetime, timedelta, timezone
+from datetime import date, datetime, timedelta
 
 log = logging.getLogger("chatpsa.timeline")
 
@@ -446,7 +445,7 @@ def _is_in_signature(text, match_start):
         if m.start() < match_start:
             # Check that the marker is reasonably close (within 500 chars)
             # and no substantial content follows that resets context
-            remaining = text[m.start():match_start]
+            # text[m.start():match_start] intentionally skipped
             # If there's a blank-line gap after the marker, the signature
             # section might have ended — but for simplicity, if a marker
             # appears anywhere before the match in the same note, flag it.
