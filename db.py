@@ -25,6 +25,35 @@ _TABLE_NAME_PATTERN = (
     r'threatlocker_computers|threatlocker_organizations)\b'
 )
 
+# Internal/admin tables hidden from the AI agent's schema view and (for the
+# security-sensitive subset) blocked from agent-generated SQL queries.
+# Schema exclusion: all tables listed here are omitted from get_schema_description()
+#   so the AI never advertises them.  This reduces noise and prevents the AI from
+#   spontaneously querying operational tables.
+# Query block: the subset marked with _BLOCKED (secrets/PII) is hard-rejected in
+#   execute_sql() even if a user explicitly asks the AI to query them.
+_INTERNAL_TABLES = frozenset({
+    # Security-sensitive (also blocked in execute_sql)
+    "app_settings",       # plaintext credentials
+    "feature_access",     # user permissions
+    "known_users",        # user PII
+    "admin_events",       # admin diagnostics
+    # Operational (hidden from schema only)
+    "sync_log",
+    "sync_state",
+    "sqlite_sequence",
+    "sql_examples",
+    "conversations",
+    "usage_log",
+    "page_views",
+    "query_themes",
+})
+
+# Subset of _INTERNAL_TABLES that contain secrets or PII — hard-blocked in execute_sql().
+_BLOCKED_TABLES = frozenset({
+    "app_settings", "feature_access", "known_users", "admin_events",
+})
+
 
 def get_or_create_secret_key():
     """Return a stable secret key shared across all gunicorn workers.
@@ -1022,7 +1051,12 @@ def get_schema_description():
     if not conn:
         return "No database found. Check local database path."
 
-    tables = conn.execute("SELECT name FROM sqlite_master WHERE type='table' AND name NOT IN ('sync_log', 'sqlite_sequence') ORDER BY name").fetchall()
+    placeholders = ",".join("?" for _ in _INTERNAL_TABLES)
+    tables = conn.execute(
+        f"SELECT name FROM sqlite_master WHERE type='table' "
+        f"AND name NOT IN ({placeholders}) ORDER BY name",
+        tuple(_INTERNAL_TABLES),
+    ).fetchall()
     schema_parts = []
 
     for table in tables:
@@ -1123,6 +1157,17 @@ def execute_sql(sql):
         if re.search(rf'\b{word}\b', stripped):
             log.warning("execute_sql denylist hit: %s", word)
             return {"error": f"Dangerous SQL keyword detected: {word}"}
+
+    # Block access to internal/admin tables that contain secrets or PII.
+    # Matches table names anywhere in the query (including string literals).
+    # This is intentionally conservative — a false positive on a query like
+    # SELECT 'app_settings' is preferable to a false negative that leaks
+    # credentials.  In practice the AI never generates queries containing
+    # these names as string literals since the tables are hidden from the schema.
+    for blocked in _BLOCKED_TABLES:
+        if re.search(rf'\b{blocked}\b', cleaned, re.IGNORECASE):
+            log.warning("execute_sql blocked access to restricted table: %s", blocked)
+            return {"error": f"Access to {blocked} is not permitted."}
 
     conn = get_db_readonly()
     if not conn:
