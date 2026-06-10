@@ -358,6 +358,7 @@ def api_status():
 
 @main_bp.route("/api/sync", methods=["POST"], endpoint="api_sync")
 @api_login_required
+@feature_required("admin")
 def api_sync():
     """Trigger a data sync from the web UI.
 
@@ -405,6 +406,7 @@ def api_sync():
 
 @main_bp.route("/api/sync/status", endpoint="api_sync_status")
 @api_login_required
+@feature_required("admin")
 def api_sync_status():
     """Return rich per-source sync state for the admin Sync tab.
 

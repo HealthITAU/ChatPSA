@@ -59,6 +59,8 @@ docker compose exec chatpsa ls -lh /data/cw_data.db
 
 ---
 
+> **Security note:** The database contains plaintext credentials (Azure, CIPP, Duo, Huntress, ThreatLocker) in the `app_settings` table. Treat backup files with the same care as your `.env` file — do not commit them to version control or store them on shared/public storage.
+
 ## Manual backup
 
 To take a one-off backup at any time:
@@ -103,4 +105,4 @@ This deletes all synced data, conversation history, agent memories, and user per
 ## See also
 
 - [Maintenance Guide](maintenance.md) — updating, rollbacks, and container management
-- [Administration Guide](administration.md) — managing settings and users from the web UI
+- [Administration Guide](administration.md) — managin
