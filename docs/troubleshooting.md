@@ -131,49 +131,10 @@ Check database size:
 docker compose exec chatpsa ls -lh /data/cw_data.db
 ```
 
-The database typically stays under 100MB for most MSPs. If it's unusually large, old ticket notes may be accumulating. The sync only adds and updates records — it doesn't delete tickets that have been removed from ConnectWise.
+If it's unusually large, old ticket notes may be accumulating. The sync only adds and updates records — it doesn't delete tickets that have been removed from ConnectWise.
 
-## Updating
+## See also
 
-### Changes not reflected after rebuild
-
-Ensure you're rebuilding without cache:
-
-```bash
-docker compose build --no-cache
-docker compose down && docker compose up -d
-```
-
-Also do a hard refresh in your browser (`Ctrl+Shift+R` / `Cmd+Shift+R`) to clear cached static assets.
-
-### Database migration errors on update
-
-ChatPSA applies schema migrations automatically on startup. If a migration fails, check the app logs:
-
-```bash
-docker compose logs psa-app | grep -i "migrate\|schema\|alter"
-```
-
-## Data and Backups
-
-### Backing up the database
-
-The SQLite databases live in the `cw-data` Docker volume, mounted at `/data` in all containers:
-
-```bash
-# Copy databases to the host
-docker compose exec chatpsa cp /data/cw_data.db /data/cw_data_backup.db
-docker cp psa-app:/data/cw_data_backup.db ./cw_data_backup.db
-```
-
-### Resetting the database
-
-To start fresh (re-syncs all data from scratch):
-
-```bash
-docker compose down
-docker volume rm chatpsa_cw-data
-docker compose up -d
-```
-
-This deletes all synced data, conversation history, agent memories, and user permissions. The first user to sign in will become admin again.
+- [Maintenance Guide](maintenance.md) — updating, backups, rollbacks, and container management
+- [Administration Guide](administration.md) — managing users, settings, and integrations from the web UI
+- [Authentication](authentication.md) — Azure AD setup, secret rotation, and credential validation
