@@ -358,6 +358,7 @@ def api_status():
 
 @main_bp.route("/api/sync", methods=["POST"], endpoint="api_sync")
 @api_login_required
+@feature_required("admin")
 def api_sync():
     """Trigger a data sync from the web UI.
 
@@ -405,6 +406,7 @@ def api_sync():
 
 @main_bp.route("/api/sync/status", endpoint="api_sync_status")
 @api_login_required
+@feature_required("admin")
 def api_sync_status():
     """Return rich per-source sync state for the admin Sync tab.
 
@@ -490,6 +492,28 @@ def api_feedback():
     if vote == "up":
         if not question or not sql_text:
             return jsonify({"error": "question and sql are required for positive feedback"}), 400
+
+        # Length caps to prevent prompt bloat
+        if len(question) > 500:
+            return jsonify({"error": "Question too long (max 500 characters)"}), 400
+        if len(sql_text) > 2000:
+            return jsonify({"error": "SQL too long (max 2000 characters)"}), 400
+
+        # Run the same safety checks as execute_sql — reject dangerous keywords
+        # and blocked tables so poisoned examples can't influence the AI
+        import re as _re
+        sql_upper = sql_text.upper().strip()
+        if not (sql_upper.startswith("SELECT") or sql_upper.startswith("WITH")):
+            return jsonify({"error": "Only SELECT queries can be saved as examples"}), 400
+        _DANGEROUS = ["INSERT", "UPDATE", "DELETE", "DROP", "ALTER", "CREATE",
+                       "ATTACH", "DETACH", "PRAGMA", "EXPLAIN"]
+        for word in _DANGEROUS:
+            if _re.search(rf'\b{word}\b', sql_upper):
+                return jsonify({"error": f"SQL contains disallowed keyword: {word}"}), 400
+        from db import _BLOCKED_TABLES
+        for blocked in _BLOCKED_TABLES:
+            if _re.search(rf'\b{blocked}\b', sql_text, _re.IGNORECASE):
+                return jsonify({"error": f"SQL references a restricted table"}), 400
 
         user = session.get("user", {}) if is_azure_enabled() else {}
         user_email = user.get("email", "anonymous")
@@ -1313,6 +1337,18 @@ def api_admin_settings_update():
 
     user = session.get("user", {}) if is_azure_enabled() else {}
     updated_by = user.get("email", "admin")
+
+    # Warn (but don't block) when credential-bearing URLs use HTTP
+    _CREDENTIAL_URL_KEYS = {"cipp_api_url", "cipp_token_url"}
+    meta = CONFIGURABLE_SETTINGS[key]
+    if key in _CREDENTIAL_URL_KEYS or (meta.get("group") and meta.get("validate", {}).get("type") == "hostname"):
+        v = str(value).strip().lower()
+        if v and v.startswith("http://") and not v.startswith("http://localhost") and not v.startswith("http://127.0.0.1"):
+            from db import log_admin_event
+            log_admin_event("settings", "warning",
+                            f"Insecure URL: {key} uses HTTP",
+                            detail=f"{key} is configured with an HTTP URL. Credentials may be sent in plaintext. Use HTTPS unless this is a local development instance.",
+                            user_email=updated_by)
 
     # Live-test Azure client secret before saving — catches typos immediately
     # rather than discovering a bad secret when the old one expires.

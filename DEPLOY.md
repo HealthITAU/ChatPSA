@@ -34,8 +34,8 @@ sudo usermod -aG docker $USER
 
 ```bash
 # On your server:
-git clone https://github.com/your-org/ChatPSA.git ~/ChatPSA
-cd ~/ChatPSA
+git clone https://github.com/your-org/ChatPSA.git ~/chatpsa
+cd ~/chatpsa
 ```
 
 Or, if deploying from a local copy:
@@ -43,7 +43,7 @@ Or, if deploying from a local copy:
 ```bash
 # From your workstation — exclude venv, database, and __pycache__
 rsync -avz --exclude='venv' --exclude='*.db' --exclude='__pycache__' \
-  ./ChatPSA/ user@your-server-ip:~/ChatPSA/
+  ./chatpsa/ user@your-server-ip:~/chatpsa/
 ```
 
 ---
@@ -88,7 +88,7 @@ Anyone not assigned will be blocked at the Microsoft login screen with an "AADST
 On the server:
 
 ```bash
-cd ~/ChatPSA
+cd ~/chatpsa
 cp .env.example .env
 nano .env
 ```
@@ -214,7 +214,7 @@ sudo systemctl reload apache2    # Graceful reload — does not drop active conn
 ## Step 8: Launch the Docker containers
 
 ```bash
-cd ~/ChatPSA
+cd ~/chatpsa
 docker compose up -d
 ```
 
@@ -289,105 +289,14 @@ sudo ufw status
 
 ---
 
-## Managing the deployment
-
-```bash
-# View logs
-docker compose logs -f psa-app
-docker compose logs -f psa-sync
-
-# Restart app after config changes
-docker compose restart chatpsa
-
-# Rebuild and restart after code changes
-docker compose up -d --build
-
-# Stop everything
-docker compose down
-
-# Force a manual sync
-docker compose exec cw-sync python sync_cw_data.py --db /data/cw_data.db
-
-# Check database size
-docker compose exec chatpsa ls -lh /data/cw_data.db
-```
-
 ---
 
-## Updating the app
+## What's next
 
-After pulling or making changes to the code:
+Your instance is running. Here's where to go from here:
 
-```bash
-# On the server: pull latest changes and rebuild
-cd ~/ChatPSA
-git pull
-docker compose up -d --build
-```
-
-Or, if deploying from a local copy:
-
-```bash
-# From your workstation:
-rsync -avz --exclude='venv' --exclude='*.db' --exclude='__pycache__' \
-  ./ChatPSA/ user@your-server-ip:~/ChatPSA/
-
-# On the server: rebuild and restart
-cd ~/ChatPSA
-docker compose up -d --build
-```
-
----
-
-## Troubleshooting
-
-**"502 Bad Gateway" from Apache:**
-The Flask app hasn't started yet, or the container is unhealthy. Check:
-```bash
-docker compose logs psa-app
-docker compose ps
-```
-
-**OAuth redirect fails / wrong URL after login:**
-Confirm the redirect URI registered in Entra ID exactly matches `https://your-domain.com/auth/callback` (https, no trailing slash). Also confirm `ProxyFix` is active — check that `app.py` contains the `ProxyFix` line and the container has been rebuilt with `docker compose up -d --build`.
-
-**Chat requests time out:**
-Each message makes two Claude API calls. If requests are failing after ~30 seconds, check that both `ProxyTimeout 120` and `Timeout 120` are set in the Apache VirtualHost.
-
-**Sync fails with 500 errors:**
-The CW API may be rate-limiting or temporarily unavailable. The sync retries automatically. Check:
-```bash
-docker compose logs psa-sync
-```
-
-**Database is empty after sync:**
-Verify CW API credentials are correct:
-```bash
-docker compose exec cw-sync python -c "from sync_cw_data import load_config, api_get; c=load_config(); print(api_get(c, 'system/info'))"
-```
-
-**Changing the app port:**
-The container listens on port 5001 internally, and the host-side port defaults to 5001 as well. If another service is already using that port, set `APP_PORT` in your `.env` file to a different value:
-```
-APP_PORT=5050
-```
-Then update the Apache VirtualHost to match:
-```apache
-ProxyPass        / http://127.0.0.1:5050/
-ProxyPassReverse / http://127.0.0.1:5050/
-```
-Rebuild and reload:
-```bash
-docker compose up -d --build
-sudo apachectl configtest
-sudo systemctl reload apache2
-```
-
-**Certificate renewal:**
-Certbot on the host auto-renews via systemd timer. Check renewal status:
-```bash
-sudo systemctl status certbot.timer
-sudo certbot renew --dry-run
-```
-After renewal, reload Apache so it picks up the new cert:
-```
+- **[Administration Guide](docs/administration.md)** - manage users, settings, integrations, and sync status from the web UI
+- **[Maintenance Guide](docs/maintenance.md)** - updating, backups, rollbacks, and container management
+- **[Backup and Restore](docs/backup.md)** - optional automated daily backups with cron
+- **[Troubleshooting](docs/troubleshooting.md)** - common issues and fixes
+- **[Integration Setup](docs/integrations/connectwise.md)** - configure optional integrations (CIPP, Duo, Huntress, ThreatLocker)

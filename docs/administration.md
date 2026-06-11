@@ -1,8 +1,10 @@
 # Administration
 
-The **Admin** page is available to users with the admin feature permission. It provides five tabs for managing users, configuring the application, monitoring data sync, reviewing usage analytics, and linking companies across services.
+The **Admin** page is available to users with the admin feature permission. It provides six tabs for managing users, configuring the application, monitoring data sync, reviewing usage analytics, linking companies across services, and viewing diagnostic events.
 
 Access the admin panel from the **Admin** link in the navigation bar. If you don't see it, an existing admin needs to grant you the **admin** feature from the Permissions tab.
+
+For server-side tasks like updating, backups, and container management, see the [Maintenance Guide](maintenance.md).
 
 ---
 
@@ -156,3 +158,28 @@ Mappings are used by the Trends page to correlate data across services. For exam
 
 The Mappings tab only appears when at least one integration besides ConnectWise is configured. If only ConnectWise is set up, there's nothing to map and the tab is hidden.
 
+---
+
+## Logs
+
+The Logs tab shows actionable diagnostic events — problems an admin can investigate and fix without SSH access to the server.
+
+### Event categories
+
+- **AI** — API errors from the chat agent (out of credit, rate limited, invalid API key, model unavailable)
+- **Auth** — authentication failures (expired secrets, invalid credentials, OAuth errors)
+- **Sync** — active sync errors from the Sync Status table
+- **Settings** — audit trail of settings changes (who changed what and when)
+- **Integration** — failed connection tests from Admin → Settings
+
+### Filters
+
+Use the category and level filter chips to narrow the view. The level filter shows All, Errors, Warnings, or Info events. The count updates to reflect the current filter.
+
+### Detail
+
+Each event shows a timestamp, category badge, level badge, and title. Click **details** to expand the full error message or context. Events older than 30 days are automatically pruned.
+
+### Sync errors
+
+Active sync errors from the Sync Status table appear in a separate section at the bottom when viewing the Sync or All category. These show the current error state of each sync entity, not historical events.

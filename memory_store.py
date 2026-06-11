@@ -37,6 +37,8 @@ from datetime import datetime, timezone
 # ── Constants ──────────────────────────────────────────────────────────────────
 
 MAX_MEMORIES_PER_USER = 5
+MAX_MEMORY_KEY_LENGTH = 100
+MAX_MEMORY_VALUE_LENGTH = 2000
 
 # ── Table creation ─────────────────────────────────────────────────────────────
 
@@ -157,6 +159,12 @@ def upsert_memory(
     """
     key   = key.strip()
     value = _sanitise_value(value.strip())
+
+    if len(key) > MAX_MEMORY_KEY_LENGTH:
+        raise MemoryValueRejected(f"Key too long (max {MAX_MEMORY_KEY_LENGTH} characters)")
+    if len(value) > MAX_MEMORY_VALUE_LENGTH:
+        raise MemoryValueRejected(f"Value too long (max {MAX_MEMORY_VALUE_LENGTH} characters)")
+
     now   = _now()
 
     conn = sqlite3.connect(db_path, timeout=10)
@@ -251,6 +259,10 @@ def update_memory(
 
     new_key   = key.strip()   if key   is not None else existing["key"]
     new_value = _sanitise_value(value.strip()) if value is not None else existing["value"]
+    if key is not None and len(key) > MAX_MEMORY_KEY_LENGTH:
+        raise MemoryValueRejected(f"Key too long (max {MAX_MEMORY_KEY_LENGTH} characters)")
+    if value is not None and len(new_value) > MAX_MEMORY_VALUE_LENGTH:
+        raise MemoryValueRejected(f"Value too long (max {MAX_MEMORY_VALUE_LENGTH} characters)")
     now = _now()
 
     conn = sqlite3.connect(db_path, timeout=10)

@@ -253,3 +253,10 @@ A table of the most recent queries showing timestamp, user, query text, source (
 ### Access
 
 Analytics is gated behind the **admin** feature permission. Only users with admin access can view this page.
+
+
+## Changelog
+
+ChatPSA includes an in-app changelog accessible from the clock icon in the navigation bar and at `/changelog`. It shows a summary of recent user-facing changes — new features, UI improvements, and notable fixes.
+
+The in-app changelog captures user-facing changes only. For the full commit history and technical details, see the [GitHub repository](https://github.com/HealthITAU/ChatPSA).

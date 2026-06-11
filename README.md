@@ -79,8 +79,8 @@ For a deeper look at each feature — how it works, limits, and configuration �
 **Prerequisites:** [Docker](https://docs.docker.com/engine/install/),  [Docker Compose](https://docs.docker.com/compose/install/) (v2), a [Claude API Key](https://console.anthropic.com) and [Connectwise PSA API credentials](docs/integrations/connectwise.md).
 
 ```bash
-git clone https://github.com/HealthITAU/ChatPSA.git
-cd ChatPSA
+git clone https://github.com/HealthITAU/ChatPSA.git chatpsa
+cd chatpsa
 cp .env.example .env
 ```
 
@@ -152,9 +152,11 @@ ChatPSA runs entirely in Docker. The included `docker-compose.yml` starts the we
 
 For production deployment with HTTPS, SSO, and a reverse proxy, see:
 
-- [Full Deployment Guide](DEPLOY.md) — step-by-step Ubuntu + Apache setup
+- [Deployment Guide](DEPLOY.md) — first-time Ubuntu + Apache setup
+- [Maintenance Guide](docs/maintenance.md) — updating, backups, rollbacks, and container management
+- [Administration Guide](docs/administration.md) — managing users, settings, and integrations from the web UI
+- [Authentication](docs/authentication.md) — Microsoft Entra ID SSO and secret rotation
 - [Reverse Proxy Setup](docs/reverse-proxy.md) — Nginx, Apache, and Caddy examples
-- [Authentication](docs/authentication.md) — Microsoft Entra ID SSO configuration
 - [Troubleshooting](docs/troubleshooting.md) — common issues and fixes
 - [Timezone Configuration](docs/timezone.md) — IANA timezone names and DST handling
 
@@ -174,11 +176,27 @@ Optional sync containers (CIPP, Duo, ThreatLocker, Huntress) start automatically
 
 ### Updating
 
+Your database and settings are preserved across updates — they live on a Docker volume independent of the containers.
+
 ```bash
+cd ~/chatpsa
 git pull
-docker compose build --no-cache
-docker compose down && docker compose up -d
+docker compose up -d --build
 ```
+
+After updating, check for new optional settings in Admin → Settings and review the container logs (`docker compose logs psa-app --tail 20`) to confirm a clean start. See the [Maintenance Guide](docs/maintenance.md#rolling-back) for rollback instructions and more detail.
+
+**If you forked this repo on GitHub**, you'll need to sync your fork when we release updates:
+
+1. Go to your fork on GitHub — you'll see a banner saying "This branch is X commits behind HealthITAU/ChatPSA". Click **Sync fork → Update branch**.
+2. On your server, pull the updated code and rebuild:
+   ```bash
+   cd ~/chatpsa
+   git pull
+   docker compose up -d --build
+   ```
+
+If you cloned directly (without forking), `git pull` picks up updates automatically.
 
 ---
 
