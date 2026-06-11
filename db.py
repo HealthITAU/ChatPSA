@@ -54,6 +54,11 @@ _BLOCKED_TABLES = frozenset({
     "app_settings", "feature_access", "known_users", "admin_events",
 })
 
+# Maximum wall-clock seconds for agent-generated SQL queries.
+# SQLite's progress_handler is called every N VM instructions; if the
+# elapsed time exceeds this budget the query is cancelled.
+_QUERY_TIMEOUT_SECONDS = 30
+
 
 def get_or_create_secret_key():
     """Return a stable secret key shared across all gunicorn workers.
@@ -1174,6 +1179,15 @@ def execute_sql(sql):
         log.warning("execute_sql called but DB not found at %s", DB_PATH)
         return {"error": "Database not found. Check local database path."}
 
+    # Cancel the query if it exceeds the time budget.
+    # The progress handler fires every 1000 VM instructions (~0.1ms).
+    _query_deadline = time.monotonic() + _QUERY_TIMEOUT_SECONDS
+
+    def _check_timeout():
+        return 1 if time.monotonic() > _query_deadline else 0
+
+    conn.set_progress_handler(_check_timeout, 1000)
+
     try:
         cursor = conn.execute(cleaned)
         columns = [desc[0] for desc in cursor.description] if cursor.description else []
@@ -1195,6 +1209,9 @@ def execute_sql(sql):
     except Exception as e:
         conn.close()
         elapsed_ms = int((time.monotonic() - started) * 1000)
+        if "interrupted" in str(e).lower():
+            log.warning("execute_sql timed out after %ds sql=%s", _QUERY_TIMEOUT_SECONDS, sql[:200])
+            return {"error": f"Query timed out after {_QUERY_TIMEOUT_SECONDS} seconds. Try a more specific query."}
         log.warning("execute_sql failed ms=%d err=%s sql=%s", elapsed_ms, e, sql[:200])
         return {"error": str(e)}
 

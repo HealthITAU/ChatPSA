@@ -80,6 +80,11 @@ def _execute_query_pin(pin):
     if not conn:
         return "Database unavailable"
     try:
+        # Apply the same timeout as execute_sql to prevent runaway queries
+        import time as _time
+        from db import _QUERY_TIMEOUT_SECONDS
+        _deadline = _time.monotonic() + _QUERY_TIMEOUT_SECONDS
+        conn.set_progress_handler(lambda: 1 if _time.monotonic() > _deadline else 0, 1000)
         rows = conn.execute(pin["sql_text"]).fetchmany(20)
         return [dict(r) for r in rows]
     except Exception as e:

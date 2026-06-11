@@ -379,6 +379,7 @@ def sync_one_type(config, ep, tenants, known_hashes, now_iso, conn):
     policies  = []
     snapshots = []
     stats = {"tenants": 0, "policies": 0, "changed": 0, "errors": 0}
+    successful_tids = set()
 
     for t in tenants:
         tid = t.get("customerId") or t.get("tenantId") or t.get("id")
@@ -395,6 +396,7 @@ def sync_one_type(config, ep, tenants, known_hashes, now_iso, conn):
 
         if not raw_items:
             stats["tenants"] += 1
+            successful_tids.add(tid)
             continue
 
         # Singletons return a single dict — wrap for uniform handling
@@ -423,8 +425,9 @@ def sync_one_type(config, ep, tenants, known_hashes, now_iso, conn):
                 stats["changed"] += 1
 
         stats["tenants"] += 1
+        successful_tids.add(tid)
 
-    return policies, snapshots, stats
+    return policies, snapshots, stats, successful_tids
 
 
 def sync_policies(config, conn):
@@ -456,7 +459,7 @@ def sync_policies(config, conn):
         ptype = ep["policy_type"]
         print(f"  {ptype}...", flush=True)
 
-        policies, snapshots, stats = sync_one_type(
+        policies, snapshots, stats, successful_tids = sync_one_type(
             config, ep, tenants, known_hashes, now_iso, conn
         )
 
@@ -477,9 +480,9 @@ def sync_policies(config, conn):
         for p in policies:
             current_ids_by_tenant.setdefault(p["tenant_id"], []).append(p["policy_id"])
 
-        # Also handle tenants that returned zero policies this cycle
-        synced_tenants = {t.get("customerId") or t.get("tenantId") or t.get("id") for t in tenants if t}
-        for tid in synced_tenants:
+        # Only prune policies for tenants that sync_one_type confirmed
+        # as successful. Failed tenants keep their existing data.
+        for tid in successful_tids:
             current_ids = current_ids_by_tenant.get(tid, [])
             if current_ids:
                 placeholders = ",".join("?" for _ in current_ids)
@@ -631,14 +634,38 @@ def sync_licenses(config, conn):
             except Exception as e:
                 print(f"  Warning: Skipped license for tenant {tid}: {e}", file=sys.stderr)
 
-    # Prune licenses with stale synced_at (not updated this run)
-    pruned = conn.execute(
-        "DELETE FROM cipp_licenses WHERE synced_at < ?", (now,)
-    ).rowcount
+    # Prune licenses only for tenants that were successfully synced —
+    # if a tenant was skipped (API error), its existing licenses are still valid.
+    if skipped:
+        # Build set of successfully synced tenant IDs
+        skipped_tids = set()
+        for tenant in tenants:
+            tid = tenant[0]
+            # A tenant was skipped if it has no licenses updated this run
+            row = conn.execute(
+                "SELECT 1 FROM cipp_licenses WHERE tenant_id = ? AND synced_at = ?",
+                (tid, now)
+            ).fetchone()
+            if not row:
+                skipped_tids.add(tid)
+        if skipped_tids:
+            placeholders = ",".join("?" for _ in skipped_tids)
+            pruned = conn.execute(
+                f"DELETE FROM cipp_licenses WHERE synced_at < ? AND tenant_id NOT IN ({placeholders})",
+                [now] + list(skipped_tids),
+            ).rowcount
+        else:
+            pruned = conn.execute(
+                "DELETE FROM cipp_licenses WHERE synced_at < ?", (now,)
+            ).rowcount
+    else:
+        pruned = conn.execute(
+            "DELETE FROM cipp_licenses WHERE synced_at < ?", (now,)
+        ).rowcount
     if pruned:
         print(f"  Pruned {pruned} stale license(s)")
     conn.commit()
-    skip_note = f", {skipped} skipped" if skipped else ""
+    skip_note = f", {skipped} tenant(s) skipped" if skipped else ""
     print(f"  Stored {total} license entries across {len(tenants) - skipped}/{len(tenants)} tenants{skip_note}")
     return total
 
@@ -686,8 +713,20 @@ def sync_alerts(config, conn):
                 raised_at = a.get("raisedAt") or a.get("timestamp")
             all_alerts.append((tid, tname, alert_type, msg, severity, url, raised_at, now, json.dumps(a)))
 
-    # Step 2: Quick DELETE + INSERT in a tight batch (no API calls between)
-    conn.execute("DELETE FROM cipp_alerts")
+    # Step 2: Delete and replace only for tenants that were successfully fetched.
+    # Tenants that errored keep their existing alerts intact.
+    successful_tids = set(row[0] for row in all_alerts)  # tenant_ids in collected alerts
+    if skipped and successful_tids:
+        # Only delete alerts for tenants we successfully fetched
+        placeholders = ",".join("?" for _ in successful_tids)
+        conn.execute(
+            f"DELETE FROM cipp_alerts WHERE tenant_id IN ({placeholders})",
+            list(successful_tids),
+        )
+    elif not skipped:
+        # All tenants succeeded — safe to clear everything
+        conn.execute("DELETE FROM cipp_alerts")
+    # If all tenants failed (skipped == len(tenants)), don't delete anything
     batch = 0
     for row in all_alerts:
         try:
