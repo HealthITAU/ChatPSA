@@ -1168,6 +1168,13 @@ def api_admin_permissions_update():
                 (feature, email, now)
             )
         else:
+            # Prevent revoking the last admin — would lock everyone out
+            if feature == "admin":
+                admin_count = conn.execute(
+                    "SELECT COUNT(*) FROM feature_access WHERE feature = 'admin'"
+                ).fetchone()[0]
+                if admin_count <= 1:
+                    return jsonify({"ok": False, "error": "Cannot remove the last admin. At least one admin must remain."}), 400
             conn.execute(
                 "DELETE FROM feature_access WHERE feature = ? AND LOWER(user_email) = ?",
                 (feature, email)
